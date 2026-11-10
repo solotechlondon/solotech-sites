@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0a0a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Live Karaoke</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:#0a0a0a;--surface:#141414;--surface2:#1e1e1e;--surface3:#2a2a2a;
+  --border:#3a3a3a;--red:#e63946;--red-dim:#9b1c26;--green:#2dc653;
+  --amber:#f4a261;--text:#f5f5f5;--text-dim:#999;--text-muted:#555;
+  --display:'Bebas Neue',sans-serif;--body:'DM Sans',sans-serif;
+  --r:10px;--rl:16px;
+}
+html,body,#root{height:100%;background:var(--black);color:var(--text);font-family:var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.app{min-height:100vh;display:flex;flex-direction:column}
+
+/* TOPBAR — header + now playing merged into one strip */
+.topbar{background:linear-gradient(90deg,var(--surface) 0%,#1a1212 100%);border-bottom:2px solid var(--red-dim);padding:9px 14px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;min-height:0}
+.topbar-left{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.topbar-title{font-family:var(--display);font-size:18px;letter-spacing:1px;color:var(--red)}
+.badge{font-size:11px;background:var(--surface3);color:var(--text-dim);padding:4px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;flex-shrink:0}
+.topbar-now{flex:1;min-width:0;display:flex;align-items:center;gap:8px;overflow:hidden}
+.np-dot{width:9px;height:9px;background:var(--red);border-radius:50%;animation:pulse 1.5s ease-in-out infinite;flex-shrink:0}
+.np-dot.off{background:var(--text-muted);animation:none}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+.topbar-now-text{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-now-text.off{color:var(--text-muted);font-weight:600}
+.topbar-now-artist{color:var(--text-dim);font-weight:600}
+
+/* MAIN */
+.main{flex:1;padding:16px;max-width:600px;margin:0 auto;width:100%}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:18px;margin-bottom:14px}
+.card-title{font-family:var(--display);font-size:18px;letter-spacing:.5px;color:var(--text-dim);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.cnt{background:var(--surface3);color:var(--text-dim);font-family:var(--body);font-size:12px;padding:3px 8px;border-radius:20px;font-weight:700}
+
+/* FORMS */
+input,select{width:100%;background:var(--surface2);border:2px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--body);font-size:18px;font-weight:600;padding:14px 16px;outline:none;transition:border-color .15s;-webkit-appearance:none;appearance:none}
+input:focus{border-color:var(--red)}
+input::placeholder{color:var(--text-muted);font-weight:400}
+.fg{margin-bottom:14px}
+.fl{display:block;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:8px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:var(--r);font-family:var(--body);font-weight:800;font-size:16px;cursor:pointer;padding:13px 18px;transition:opacity .1s,transform .1s;white-space:nowrap;-webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:48px}
+.btn:active{opacity:.7;transform:scale(.97)}
+.btn:disabled{opacity:.35;pointer-events:none}
+.btn-p{background:var(--red);color:#fff}
+.btn-s{background:var(--green);color:var(--black)}
+.btn-g{background:var(--surface3);color:var(--text)}
+.btn-d{background:#3a1010;color:#ff9999;border:1px solid #6a2020}
+.btn-a{background:#3a2810;color:var(--amber);border:1px solid #6a4020}
+.btn-full{width:100%;padding:18px;font-size:18px;min-height:56px}
+.btn-sm{padding:10px 14px;font-size:15px;font-weight:800;min-height:44px}
+.btn-ic{padding:10px;min-width:44px;min-height:44px;font-size:16px}
+
+/* REQUEST ITEMS */
+.req{background:var(--surface2);border:2px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.req-song{font-weight:800;font-size:17px;line-height:1.3}
+.req-artist{font-size:14px;color:var(--text-dim);font-weight:600;margin-top:2px}
+.req-name{font-size:15px;color:var(--amber);font-weight:800;margin-top:4px}
+.req-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+/* PLAYLIST ITEMS */
+.pl-item{background:var(--surface2);border:2px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:grab;transition:background .15s,border-color .15s}
+.pl-item.drag-over{border-color:var(--red);background:#1e1010}
+.pl-item.playing{border-color:var(--red);background:linear-gradient(135deg,#1e0f0f,#1a1212);cursor:default}
+.pl-pos{font-family:var(--display);font-size:26px;color:var(--text-muted);min-width:34px;text-align:center}
+.pl-pos.active{color:var(--red)}
+.pl-info{flex:1;min-width:0}
+.pl-song{font-weight:800;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-meta{font-size:13px;color:var(--text-dim);font-weight:600;margin-top:2px}
+.pl-singer{font-size:13px;color:var(--amber);font-weight:800;margin-top:2px}
+.pl-ctrls{display:flex;gap:6px;flex-shrink:0}
+
+/* TAGS */
+.tag{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:3px 7px;border-radius:4px;margin-left:4px}
+.tag-e{background:#2a1a3a;color:#c084fc}
+.tag-b{background:#0d2233;color:#7bb8d4}
+
+/* BAND VIEW */
+.bc{background:linear-gradient(135deg,#1a0a0a,#200f0f);border:3px solid var(--red);border-radius:var(--rl);padding:24px;margin-bottom:16px;text-align:center}
+.bc-label{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:var(--red);font-weight:800;margin-bottom:10px}
+.bc-song{font-family:var(--display);font-size:46px;line-height:1;margin-bottom:6px}
+.bc-artist{font-size:18px;color:var(--text-dim);font-weight:600;margin-bottom:10px}
+.bc-singer{font-size:17px;color:var(--amber);font-weight:800}
+.bn{background:var(--surface2);border:2px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.bn-num{font-family:var(--display);font-size:34px;color:var(--text-muted);min-width:38px}
+.bn-song{font-weight:800;font-size:18px}
+.bn-artist{font-size:14px;color:var(--text-dim);font-weight:600;margin-top:2px}
+.bn-singer{font-size:14px;color:var(--amber);font-weight:800;margin-top:3px}
+
+/* QUEUE */
+.qi{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)}
+.qi:last-child{border-bottom:none}
+.qi-num{font-family:var(--display);font-size:28px;color:var(--text-muted);min-width:36px}
+.qi-name{font-weight:800;font-size:18px}
+
+/* PIN */
+.pin-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 16px}
+.pin-title{font-family:var(--display);font-size:56px;color:var(--red);letter-spacing:2px;margin-bottom:4px}
+.pin-sub{color:var(--text-dim);margin-bottom:32px;font-size:16px;font-weight:600}
+.pin-in{text-align:center;font-size:32px;letter-spacing:10px;max-width:220px;margin-bottom:16px;font-weight:800}
+.pin-err{color:var(--red);font-size:15px;margin-top:8px;font-weight:700}
+
+/* TABS */
+.tabs{display:flex;background:var(--surface);border-bottom:2px solid var(--border)}
+.tab{flex:1;padding:14px 8px;text-align:center;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;transition:color .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
+.tab.active{color:var(--red);border-bottom-color:var(--red)}
+
+/* MISC */
+.empty{text-align:center;padding:32px 16px;color:var(--text-muted);font-size:16px;font-weight:600}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.nav{display:flex;gap:16px;padding:20px;justify-content:center}
+.nav a{color:var(--text-dim);font-size:15px;font-weight:700;cursor:pointer;text-decoration:none}
+.nav a:hover{color:var(--text)}
+.search-wrap{position:relative}
+.search-results{position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:2px solid var(--border);border-radius:0 0 var(--r) var(--r);max-height:260px;overflow-y:auto;z-index:200}
+.sr-item{padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border)}
+.sr-item:last-child{border-bottom:none}
+.sr-item:active{background:var(--surface3)}
+.sr-title{font-weight:800;font-size:16px}
+.sr-artist{font-size:13px;color:var(--text-dim);font-weight:600;margin-top:2px}
+.note{font-size:12px;color:var(--text-muted);font-style:italic;margin-top:3px;font-weight:600}
+
+/* SECTION BAR + MENU OVERLAY (vertical list of 6) */
+.section-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface);border-bottom:2px solid var(--border);flex-shrink:0}
+.section-title{font-family:var(--display);font-size:16px;letter-spacing:1px;color:var(--text)}
+.menu-btn{background:var(--surface3);border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-family:var(--display);font-size:12px;letter-spacing:1px;padding:7px 11px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.menu-btn:active{background:var(--surface2)}
+.menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300}
+.menu-panel{position:fixed;top:0;right:0;bottom:0;width:min(78vw,320px);overflow-y:auto;background:linear-gradient(180deg,#1c1c1c 0%,#131313 100%);border-left:3px solid var(--border);padding:14px 10px;box-shadow:-8px 0 24px rgba(0,0,0,.5)}
+.admin-grid{display:flex;flex-direction:column;gap:6px}
+.tile{position:relative;background:#181818;border:1px solid #303030;border-radius:3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 -2px 4px rgba(0,0,0,.5);display:flex;align-items:center;gap:12px;padding:12px 13px;width:100%;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .1s,box-shadow .1s;font-family:inherit}
+.tile:active{box-shadow:inset 0 2px 5px rgba(0,0,0,.6)}
+.tile.active{background:#221111;border-color:var(--red-dim);box-shadow:inset 0 0 0 1px var(--red),0 0 12px rgba(230,57,70,.28)}
+.tile-glyph{font-size:17px;line-height:1;color:var(--text-dim);opacity:.85;width:20px;text-align:center;flex-shrink:0}
+.tile.active .tile-glyph{color:var(--red);opacity:1}
+.tile-label{font-family:var(--display);font-size:15px;letter-spacing:1.2px;color:var(--text-dim);flex:1}
+.tile.active .tile-label{color:var(--text)}
+.tile-led{position:static;margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:2px;background:var(--red);color:#fff;font-family:var(--body);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 5px rgba(230,57,70,.7);flex-shrink:0}
+
+/* SONG TILE GRID (queue / requests) — condensed */
+.tile-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.song-tile{background:#181818;border:1px solid #2c2c2c;border-radius:4px;padding:8px 9px;display:flex;flex-direction:column;gap:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),inset 0 -2px 5px rgba(0,0,0,.45)}
+.st-title{font-weight:800;font-size:12.5px;line-height:1.2}
+.st-artist{font-size:10.5px;color:var(--text-dim);font-weight:600}
+.st-singer{font-size:10.5px;color:var(--amber);font-weight:800}
+.st-acts{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px}
+.btn-tiny{padding:5px 3px;font-size:10px;font-weight:800;min-height:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+// ── CONFIG ── PASTE YOUR SUPABASE VALUES HERE ─────────────────────────────────
+const SUPABASE_URL = 'https://qwitfoaoxjcbvxyqelrj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3aXRmb2FveGpjYnZ4eXFlbHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMDM4MTIsImV4cCI6MjA5NDc3OTgxMn0.bp9GDgHM5k5J0_9skH20aNjnd9nheAAQwupqZOD05O8';
+const ADMIN_PIN = '2580';
+const BAND_PIN  = '6666';
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const { useState, useEffect, useRef } = React;
+
+// ── ONSONG ────────────────────────────────────────────────────────────────────
+function openInOnSong(songTitle) {
+  // encodeURIComponent leaves ' unescaped, which breaks iOS's URL parsing
+  const encoded = encodeURIComponent(songTitle).replace(/'/g, '%27');
+  window.location.href = `onsong://open/songs?song=${encoded}`;
+}
+
+// ── SONG LIST ─────────────────────────────────────────────────────────────────
+// The master song list lives in Supabase (table: songs) so it can be edited from
+// Admin > Songs and synced via CSV import, rather than hardcoded here.
+
+// Minimal CSV parser (handles quoted fields, embedded commas, "" escaping)
+function parseCSV(text) {
+  const rows = [];
+  let field = '', row = [], inQuotes = false, i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"') { inQuotes = true; i++; continue; }
+    if (c === ',') { row.push(field); field = ''; i++; continue; }
+    if (c === '\r') { i++; continue; }
+    if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+    field += c; i++;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+
+// ── REALTIME HOOK ─────────────────────────────────────────────────────────────
+function useRealtime(table, cb) {
+  useEffect(() => {
+    const ch = sb.channel('rt:' + table)
+      .on('postgres_changes', { event:'*', schema:'public', table }, cb)
+      .subscribe();
+    return () => sb.removeChannel(ch);
+  }, []);
+}
+
+// ── PIN SCREEN ────────────────────────────────────────────────────────────────
+function PinScreen({ role, onSuccess }) {
+  const [pin, setPin] = useState('');
+  const [err, setErr] = useState('');
+  const check = () => {
+    if (pin === (role === 'admin' ? ADMIN_PIN : BAND_PIN)) { onSuccess(); }
+    else { setErr('Wrong PIN'); setPin(''); }
+  };
+  return (
+    <div className="pin-screen">
+      <div className="pin-title">🎸</div>
+      <div className="pin-title">{role === 'admin' ? 'ADMIN' : 'BAND'}</div>
+      <div className="pin-sub">Enter PIN to continue</div>
+      <input className="pin-in" type="password" inputMode="numeric" maxLength={4}
+        value={pin} placeholder="••••" autoFocus
+        onChange={e => { setPin(e.target.value); setErr(''); }}
+        onKeyDown={e => e.key === 'Enter' && check()} />
+      <button className="btn btn-p btn-full" style={{maxWidth:200}} onClick={check}>Enter</button>
+      {err && <div className="pin-err">{err}</div>}
+    </div>
+  );
+}
+
+// ── SONG SEARCH (used in admin Add tab only) ──────────────────────────────────
+function SongSearch({ songs, onSelect }) {
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(null);
+  const [open, setOpen] = useState(false);
+  const results = q.length > 1
+    ? songs.filter(s => s.title.toLowerCase().includes(q.toLowerCase()) || s.artist.toLowerCase().includes(q.toLowerCase())).slice(0,12)
+    : [];
+
+  const choose = s => { setSel(s); setQ(''); setOpen(false); onSelect(s); };
+  const clear = () => { setSel(null); setQ(''); onSelect(null); };
+
+  return (
+    <div className="search-wrap">
+      <input
+        value={sel ? `${sel.title} - ${sel.artist}` : q}
+        placeholder="Search song or artist..."
+        onChange={e => { setQ(e.target.value); setSel(null); setOpen(true); onSelect(null); }}
+        onFocus={() => setOpen(true)}
+      />
+      {sel && <button onClick={clear} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--text-dim)',cursor:'pointer',fontSize:18}}>×</button>}
+      {open && results.length > 0 && !sel && (
+        <div className="search-results">
+          {results.map((s,i) => (
+            <div key={i} className="sr-item" onMouseDown={() => choose(s)} onTouchEnd={() => choose(s)}>
+              <div className="sr-title">{s.title}{s.bandOnly && <span className="tag tag-b" style={{marginLeft:6}}>Band</span>}</div>
+              <div className="sr-artist">{s.artist}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PUBLIC VIEW ───────────────────────────────────────────────────────────────
+function PublicView({ np, songs }) {
+  const [name, setName] = useState('');
+  const [song, setSong] = useState(null);
+  const [filter, setFilter] = useState('');
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [queue, setQueue] = useState([]);
+  const [queuedTitles, setQueuedTitles] = useState(new Set());
+  const touchStartY = useRef(0);
+
+  useEffect(() => { fetchQueue(); }, []);
+  useRealtime('playlist', fetchQueue);
+  useRealtime('requests', fetchQueue);
+
+  async function fetchQueue() {
+    const { data } = await sb.from('playlist').select('*').in('status',['queued','playing']).order('position');
+    const items = data || [];
+    setQueue(items.filter(p => p.status === 'queued'));
+    // Also hide songs that have a pending request already
+    const { data: reqs } = await sb.from('requests').select('song_title').eq('status','pending');
+    const titles = new Set([
+      ...items.map(p => p.song_title),
+      ...(reqs || []).map(r => r.song_title),
+    ]);
+    setQueuedTitles(titles);
+  }
+
+  async function submit() {
+    if (!name.trim() || !song) return;
+    setBusy(true);
+    await sb.from('requests').insert({ singer_name:name.trim(), song_title:song.title, artist:song.artist, status:'pending' });
+    setBusy(false);
+    setDone(true);
+  }
+
+  const publicSongs = songs.filter(s => !s.hidden && !s.bandOnly);
+  const availableSongs = publicSongs.filter(s => !queuedTitles.has(s.title));
+  const filtered = filter.length > 0
+    ? availableSongs.filter(s => s.title.toLowerCase().includes(filter.toLowerCase()) || s.artist.toLowerCase().includes(filter.toLowerCase()))
+    : availableSongs;
+
+  if (done) return (
+    <div className="main">
+      <div className="card" style={{textAlign:'center',padding:32}}>
+        <div style={{fontSize:48,marginBottom:12}}>🎤</div>
+        <div style={{fontFamily:'var(--display)',fontSize:28,color:'var(--green)',marginBottom:8}}>YOU'RE IN!</div>
+        <div style={{fontSize:16,marginBottom:4}}>{song.title}</div>
+        <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:20}}>by {song.artist}</div>
+        <div style={{fontSize:14,color:'var(--text-dim)'}}>Request submitted for <strong style={{color:'var(--amber)'}}>{name}</strong></div>
+        <div className="divider" />
+        <button className="btn btn-g btn-full" onClick={() => { setDone(false); setName(''); setSong(null); setFilter(''); }}>Submit Another</button>
+      </div>
+      <div className="card">
+        <div className="card-title">Coming Up <span className="cnt">{queue.length}</span></div>
+        {queue.length === 0 ? <div className="empty">Queue is empty</div>
+          : queue.map((item,i) => (
+            <div className="qi" key={item.id}>
+              <div className="qi-num">{i+1}</div>
+              <div className="qi-name">{item.singer_name || 'Band'}</div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="card-title">Request a Song</div>
+        <div className="fg">
+          <label className="fl">Your Name</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="What should we call you?" />
+        </div>
+
+        {song ? (
+          <div style={{background:'var(--surface3)',border:'1px solid var(--red)',borderRadius:'var(--r)',padding:'12px 14px',marginBottom:12,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div>
+              <div style={{fontWeight:600,fontSize:14}}>{song.title}</div>
+              <div style={{fontSize:12,color:'var(--text-dim)'}}>{song.artist}</div>
+            </div>
+            <button onClick={() => { setSong(null); setFilter(''); }} style={{background:'none',border:'none',color:'var(--text-dim)',cursor:'pointer',fontSize:20,padding:'0 4px'}}>×</button>
+          </div>
+        ) : (
+          <div className="fg">
+            <label className="fl">Song <span style={{color:'var(--text-muted)',fontWeight:400,textTransform:'none',letterSpacing:0}}>— scroll or filter</span></label>
+            <input
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              placeholder="Filter songs..."
+              style={{marginBottom:8}}
+            />
+            <div style={{
+              background:'var(--surface2)',
+              border:'1px solid var(--border)',
+              borderRadius:'var(--r)',
+              maxHeight:260,
+              overflowY:'auto',
+              WebkitOverflowScrolling:'touch',
+            }}>
+              {filtered.map((s,i) => (
+                <div key={i}
+                  style={{
+                    padding:'11px 14px',
+                    borderBottom: i < filtered.length-1 ? '1px solid var(--border)' : 'none',
+                    cursor:'pointer',
+                  }}
+                  onMouseDown={() => setSong(s)}
+                  onTouchStart={e => { touchStartY.current = e.touches[0].clientY; }}
+                  onTouchEnd={e => {
+                    const delta = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+                    if (delta < 8) setSong(s);
+                  }}
+                >
+                  <div style={{fontWeight:600,fontSize:14}}>{s.title}</div>
+                  <div style={{fontSize:12,color:'var(--text-dim)'}}>{s.artist}</div>
+                </div>
+              ))}
+              {filtered.length === 0 && <div style={{padding:'16px',color:'var(--text-muted)',fontSize:13,textAlign:'center'}}>No songs match</div>}
+            </div>
+          </div>
+        )}
+
+        <button className="btn btn-p btn-full" onClick={submit} disabled={!name.trim() || !song || busy}>
+          {busy ? 'Submitting...' : 'Request This Song 🎤'}
+        </button>
+      </div>
+      <div className="card">
+        <div className="card-title">Coming Up <span className="cnt">{queue.length}</span></div>
+        {queue.length === 0 ? <div className="empty">Be the first to request!</div>
+          : queue.map((item,i) => (
+            <div className="qi" key={item.id}>
+              <div className="qi-num">{i+1}</div>
+              <div className="qi-name">{item.singer_name || 'Band'}</div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+// ── ADMIN VIEW ────────────────────────────────────────────────────────────────
+function AdminView({ songs, songsError }) {
+  const [requests, setRequests] = useState([]);
+  const [playlist, setPlaylist] = useState([]);
+  const [played, setPlayed] = useState([]);
+  const [tab, setTab] = useState('queue');
+  const [dragOver, setDragOver] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const dragItem = useRef(null);
+
+  useEffect(() => { fetchRequests(); fetchPlaylist(); fetchPlayed(); }, []);
+  useRealtime('requests', fetchRequests);
+  useRealtime('playlist', () => { fetchPlaylist(); fetchPlayed(); });
+
+  async function fetchRequests() {
+    const { data } = await sb.from('requests').select('*').eq('status','pending').order('created_at');
+    setRequests(data || []);
+  }
+  async function fetchPlaylist() {
+    const { data } = await sb.from('playlist').select('*').in('status',['queued','playing']).order('position');
+    setPlaylist(data || []);
+  }
+  async function fetchPlayed() {
+    const { data } = await sb.from('playlist').select('*').eq('status','done').order('id', {ascending:false}).limit(10);
+    setPlayed(data || []);
+  }
+
+  const queued = playlist.filter(p => p.status === 'queued').sort((a,b) => a.position - b.position);
+  const nowPlaying = playlist.find(p => p.status === 'playing');
+  const inPlaylist = new Set(playlist.map(p => p.song_title + '|||' + (p.singer_name || '')));
+  const pendingRequests = requests.filter(r => !inPlaylist.has(r.song_title + '|||' + (r.singer_name || '')));
+  const maxPos = () => queued.length > 0 ? Math.max(...queued.map(p => p.position)) : 0;
+  const minPos = () => queued.length > 0 ? Math.min(...queued.map(p => p.position)) : 1;
+
+  // Request actions
+  async function acceptReq(req, pos) {
+    await sb.from('playlist').insert({
+      song_title:req.song_title, artist:req.artist, singer_name:req.singer_name,
+      status:'queued', position:pos, source:'request'
+    });
+    await sb.from('requests').update({status:'accepted'}).eq('id',req.id);
+    fetchPlaylist(); fetchRequests();
+  }
+  async function addReq(req)    { await acceptReq(req, maxPos() + 1); }
+  async function nextReq(req)   { await acceptReq(req, minPos() - 1); }
+  async function encoreReq(req) {
+    await sb.from('playlist').insert({
+      song_title:req.song_title, artist:req.artist, singer_name:req.singer_name,
+      status:'queued', position:maxPos() + 100, source:'encore'
+    });
+    await sb.from('requests').update({status:'accepted'}).eq('id',req.id);
+    fetchPlaylist(); fetchRequests();
+  }
+  async function rejectReq(id) {
+    await sb.from('requests').update({status:'rejected'}).eq('id',id);
+    fetchRequests();
+  }
+
+  // Playlist actions
+  async function setNow(item) {
+    await sb.from('playlist').update({status:'done'}).eq('status','playing');
+    await sb.from('playlist').update({status:'playing'}).eq('id',item.id);
+    await sb.from('app_state').upsert({id:1, now_playing_song:item.song_title, now_playing_artist:item.artist, now_playing_singer:item.singer_name});
+    openInOnSong(item.song_title);
+    fetchPlaylist(); fetchPlayed();
+  }
+  async function remove(id) {
+    await sb.from('playlist').update({status:'removed'}).eq('id',id);
+    fetchPlaylist();
+  }
+  async function moveTop(item) {
+    await sb.from('playlist').update({position:minPos()-1}).eq('id',item.id);
+    fetchPlaylist();
+  }
+  async function bump(item) {
+    const idx = queued.findIndex(p => p.id === item.id);
+    const targetIdx = Math.min(idx + 5, queued.length - 1);
+    const target = queued[targetIdx];
+    if (!target || target.id === item.id) return;
+    const fromPos = item.position;
+    const toPos = target.position;
+    await sb.from('playlist').update({position: toPos}).eq('id', item.id);
+    await sb.from('playlist').update({position: fromPos}).eq('id', target.id);
+    fetchPlaylist();
+  }
+  async function unplay(item) {
+    // Puts a played song back at the top of the queue
+    await sb.from('playlist').update({status:'queued', position:minPos()-1}).eq('id',item.id);
+    fetchPlaylist(); fetchPlayed();
+  }
+
+  function onDragStart(e, item) { dragItem.current = item; e.dataTransfer.effectAllowed='move'; }
+  async function onDrop(e, target) {
+    e.preventDefault();
+    if (!dragItem.current || dragItem.current.id === target.id) return;
+    const fromPos = dragItem.current.position;
+    const toPos = target.position;
+    await sb.from('playlist').update({position:toPos}).eq('id',dragItem.current.id);
+    await sb.from('playlist').update({position:fromPos}).eq('id',target.id);
+    dragItem.current = null; setDragOver(null); fetchPlaylist();
+  }
+
+  const SectionDivider = ({label}) => (
+    <div style={{display:'flex',alignItems:'center',gap:8,margin:'16px 0 8px'}}>
+      <div style={{flex:1,height:1,background:'var(--border)'}} />
+      <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'var(--text-muted)'}}>{label}</div>
+      <div style={{flex:1,height:1,background:'var(--border)'}} />
+    </div>
+  );
+
+  const TILES = [
+    {id:'queue',    label:'Queue',    glyph:'▶', count:queued.length},
+    {id:'requests', label:'Requests', glyph:'🎤', count:pendingRequests.length},
+    {id:'played',   label:'Played',   glyph:'✓', count:0},
+    {id:'add',      label:'Add',      glyph:'+', count:0},
+    {id:'preload',  label:'Preload',  glyph:'☆', count:0},
+    {id:'songs',    label:'Songs',    glyph:'♪', count:0},
+  ];
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 90px)'}}>
+      <div className="section-bar">
+        <div className="section-title">{TILES.find(t => t.id === tab)?.label}</div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="menu-btn" title="Reload the app" onClick={() => window.location.reload()}>⟳</button>
+          <button className="menu-btn" onClick={() => setMenuOpen(true)}>☰ Sections</button>
+        </div>
+      </div>
+
+      {menuOpen && (
+        <div className="menu-overlay" onClick={() => setMenuOpen(false)}>
+          <div className="menu-panel" onClick={e => e.stopPropagation()}>
+            <div className="admin-grid" style={{height:'auto'}}>
+              {TILES.map(t => (
+                <button key={t.id} className={`tile${tab===t.id?' active':''}`} onClick={() => { setTab(t.id); setMenuOpen(false); }}>
+                  {t.count > 0 && <span className="tile-led">{t.count}</span>}
+                  <span className="tile-glyph">{t.glyph}</span>
+                  <span className="tile-label">{t.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{flex:1,overflowY:'auto',padding:12,maxWidth:640,width:'100%',margin:'0 auto'}}>
+
+        {tab === 'queue' && (<>
+
+          {/* NOW PLAYING */}
+          {nowPlaying && (
+            <div className="pl-item playing" style={{marginBottom:12}}>
+              <div className="pl-pos active">▶</div>
+              <div className="pl-info">
+                <div className="pl-song">{nowPlaying.song_title}</div>
+                <div className="pl-meta">{nowPlaying.artist}</div>
+                {nowPlaying.singer_name && <div className="pl-singer">{nowPlaying.singer_name}</div>}
+              </div>
+              <div style={{fontSize:11,color:'var(--red)',fontWeight:700}}>LIVE</div>
+            </div>
+          )}
+
+          {/* QUEUE GRID — next 6 up */}
+          {queued.length === 0 ? (
+            <div className="empty">Nothing queued. Add songs or check Requests.</div>
+          ) : (<>
+            <div className="tile-grid">
+              {queued.slice(0,6).map(item => (
+                <div key={item.id} className="song-tile">
+                  <div className="st-title">
+                    {item.song_title}
+                    {item.source==='encore' && <span className="tag tag-e">Encore</span>}
+                    {item.is_band_only && <span className="tag tag-b">Band</span>}
+                  </div>
+                  <div className="st-artist">{item.artist}</div>
+                  {item.singer_name && <div className="st-singer">🎤 {item.singer_name}</div>}
+                  {item.notes && <div className="note">{item.notes}</div>}
+                  <div className="st-acts">
+                    <button className="btn btn-p btn-tiny" onClick={() => setNow(item)}>▶ Now</button>
+                    <button className="btn btn-g btn-tiny" onClick={() => moveTop(item)}>⏭ Next</button>
+                    <button className="btn btn-g btn-tiny" onClick={() => bump(item)}>↓ Later</button>
+                    <button className="btn btn-d btn-tiny" onClick={() => remove(item.id)}>✕ Cancel</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {queued.length > 6 && <div className="note" style={{textAlign:'center',marginTop:10}}>+{queued.length - 6} more further back in the queue</div>}
+          </>)}
+
+        </>)}
+
+        {tab === 'requests' && (<>
+          {pendingRequests.length === 0 ? (
+            <div className="empty">No pending requests.</div>
+          ) : (
+            <div className="tile-grid">
+              {pendingRequests.map(r => (
+                <div key={r.id} className="song-tile">
+                  <div className="st-title">{r.song_title}</div>
+                  <div className="st-artist">{r.artist}</div>
+                  <div className="st-singer">🎤 {r.singer_name}</div>
+                  <div className="st-acts">
+                    <button className="btn btn-p btn-tiny" onClick={() => nextReq(r)}>▶ Next</button>
+                    <button className="btn btn-g btn-tiny" onClick={() => addReq(r)}>↓ Later</button>
+                    <button className="btn btn-a btn-tiny" onClick={() => encoreReq(r)}>★ Encore</button>
+                    <button className="btn btn-d btn-tiny" onClick={() => rejectReq(r.id)}>✕ Cancel</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>)}
+
+        {tab === 'played' && (<>
+          {played.length === 0
+            ? <div className="empty">Nothing played yet.</div>
+            : played.map(item => (
+                <div key={item.id} style={{
+                  background:'var(--surface)',border:'1px solid var(--border)',
+                  borderRadius:'var(--r)',padding:'10px 12px',marginBottom:6,
+                  display:'flex',alignItems:'center',gap:10,opacity:0.5,
+                }}>
+                  <div style={{fontFamily:'var(--display)',fontSize:18,color:'var(--text-muted)',minWidth:28,textAlign:'center'}}>✓</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.song_title}</div>
+                    <div style={{fontSize:12,color:'var(--text-dim)',fontWeight:600}}>{item.artist}</div>
+                    {item.singer_name && <div style={{fontSize:14,color:'var(--amber)',fontWeight:800,marginTop:2}}>🎤 {item.singer_name}</div>}
+                  </div>
+                  <button className="btn btn-g btn-sm" title="Put back at top of queue" onClick={() => unplay(item)}>Undo</button>
+                </div>
+              ))}
+        </>)}
+
+        {tab === 'add' && <AddSong queued={queued} songs={songs} onAdded={() => { setTab('queue'); fetchPlaylist(); }} />}
+        {tab === 'preload' && <Preload queued={queued} onAdded={() => { setTab('queue'); fetchPlaylist(); }} />}
+        {tab === 'songs' && <SongManager songs={songs} songsError={songsError} />}
+      </div>
+    </div>
+  );
+}
+
+// ── ADD SONG ──────────────────────────────────────────────────────────────────
+function AddSong({ queued, onAdded, songs }) {
+  const [song, setSong] = useState(null);
+  const [singer, setSinger] = useState('');
+  const [notes, setNotes] = useState('');
+  const [bandOnly, setBandOnly] = useState(false);
+  const [encore, setEncore] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const handleSelect = s => {
+    setSong(s);
+    if (s) { if (s.bandOnly) setBandOnly(true); if (s.notes) setNotes(s.notes); }
+    else { setBandOnly(false); setNotes(''); }
+  };
+
+  async function add() {
+    if (!song) return;
+    setBusy(true);
+    const maxPos = queued.length > 0 ? Math.max(...queued.map(p => p.position)) : 0;
+    await sb.from('playlist').insert({
+      song_title:song.title, artist:song.artist,
+      singer_name:singer.trim() || null,
+      notes:notes.trim() || null,
+      status:'queued',
+      position:encore ? maxPos + 100 : maxPos + 1,
+      source:bandOnly ? 'band' : encore ? 'encore' : 'admin',
+      is_band_only:bandOnly,
+    });
+    setBusy(false);
+    onAdded();
+  }
+
+  return (
+    <div className="card">
+      <div className="card-title">Add to Playlist</div>
+      <div className="fg">
+        <label className="fl">Song</label>
+        <SongSearch songs={songs} onSelect={handleSelect} />
+      </div>
+      <div className="fg">
+        <label className="fl">Singer / Performer (optional)</label>
+        <input value={singer} onChange={e => setSinger(e.target.value)} placeholder="Leave blank for band songs" />
+      </div>
+      <div className="fg">
+        <label className="fl">Notes (optional)</label>
+        <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Key, cues, anything..." />
+      </div>
+      <div style={{display:'flex',gap:16,marginBottom:16}}>
+        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:14,cursor:'pointer'}}>
+          <input type="checkbox" checked={bandOnly} onChange={e => setBandOnly(e.target.checked)} /> Band only
+        </label>
+        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:14,cursor:'pointer'}}>
+          <input type="checkbox" checked={encore} onChange={e => setEncore(e.target.checked)} /> Encore
+        </label>
+      </div>
+      <button className="btn btn-p btn-full" onClick={add} disabled={!song || busy}>
+        {busy ? 'Adding...' : 'Add to Playlist'}
+      </button>
+    </div>
+  );
+}
+
+// ── PRELOAD ───────────────────────────────────────────────────────────────────
+// Pre-defined songs from the spreadsheet with known singers/notes already filled.
+// Tap a song to add it straight to the playlist. Songs already in the playlist
+// are shown as added (greyed out).
+const PRELOAD_SONGS_DEFAULT = [
+  { title:"Play that funky music", artist:"Wild Cherry", singer:"Band", notes:"1st Set", bandOnly:true },
+  { title:"Twist and Shout", artist:"The Beatles", singer:"Band", notes:"1st Set", bandOnly:true },
+  { title:"Crazy Little Thing Called Love", artist:"Queen", singer:"Band", notes:"1st Set", bandOnly:true },
+  { title:"Cigarettes & Alcohol", artist:"Oasis", singer:"Band", notes:"1st Set", bandOnly:true },
+  { title:"Parklife", artist:"Blur", singer:"Band", notes:"1st Set", bandOnly:true },
+  { title:"Jumpin Jack Flash", artist:"Rolling Stones", singer:"Band", notes:"1st Set", bandOnly:true },
+  { title:"Let There Be Rock", artist:"AC/DC", singer:"Maddie & Tyler", notes:"1st Set", bandOnly:true },
+  { title:"In My Own Summer (Shove It)", artist:"Deftones", singer:"Band & Tyler on Guitar", notes:"1st Set", bandOnly:true },
+  { title:"Stuck In The Middle With You", artist:"Stealers Wheel", singer:"Maeve & Tom", notes:"1st Set" },
+  { title:"Golden", artist:"Harry Styles", singer:"Maeve", notes:"1st Set" },
+  { title:"Love Machine", artist:"Girls Aloud", singer:"Maeve", notes:"1st Set" },
+  { title:"Champagne Supernova", artist:"Oasis", singer:"", notes:"Encore", encore:true },
+];
+
+function Preload({ queued, onAdded }) {
+  const [songs, setSongs] = useState(PRELOAD_SONGS_DEFAULT.map((s,i) => ({...s, id:i})));
+  const [adding, setAdding] = useState(null);
+  const [added, setAdded] = useState([]);
+  const [editing, setEditing] = useState(null); // id of song being edited
+  const [editVals, setEditVals] = useState({});
+
+  const alreadyIn = title => queued.some(q => q.song_title === title) || added.includes(title);
+
+  function startEdit(s) {
+    setEditing(s.id);
+    setEditVals({ title:s.title, artist:s.artist, singer:s.singer||'', notes:s.notes||'', bandOnly:s.bandOnly||false, encore:s.encore||false });
+  }
+  function saveEdit(id) {
+    setSongs(prev => prev.map(s => s.id === id ? {...s, ...editVals} : s));
+    setEditing(null);
+  }
+  function removeRow(id) {
+    setSongs(prev => prev.filter(s => s.id !== id));
+  }
+  function addRow() {
+    const newId = Date.now();
+    setSongs(prev => [...prev, { id:newId, title:'New Song', artist:'', singer:'', notes:'', bandOnly:false, encore:false }]);
+    setEditing(newId);
+    setEditVals({ title:'', artist:'', singer:'', notes:'', bandOnly:false, encore:false });
+  }
+
+  async function addSong(s) {
+    if (alreadyIn(s.title)) return;
+    setAdding(s.title);
+    const maxPos = queued.length > 0 ? Math.max(...queued.map(p => p.position)) : 0;
+    const addedCount = added.length;
+    await sb.from('playlist').insert({
+      song_title: s.title,
+      artist: s.artist,
+      singer_name: s.singer || null,
+      notes: s.notes || null,
+      status: 'queued',
+      position: s.encore ? maxPos + 100 + addedCount : maxPos + 1 + addedCount,
+      source: s.bandOnly ? 'band' : s.encore ? 'encore' : 'admin',
+      is_band_only: s.bandOnly || false,
+    });
+    setAdded(prev => [...prev, s.title]);
+    setAdding(null);
+  }
+
+  async function addAll() {
+    const toAdd = songs.filter(s => !alreadyIn(s.title));
+    for (const s of toAdd) { await addSong(s); }
+    onAdded();
+  }
+
+  return (
+    <div>
+      <div className="card" style={{marginBottom:8}}>
+        <div className="card-title">Preload Songs</div>
+        <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:12}}>
+          Edit singers and notes, then add individually or all at once.
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-s" style={{flex:1}} onClick={addAll}>Add All</button>
+          <button className="btn btn-g" style={{flex:1}} onClick={addRow}>+ Row</button>
+        </div>
+      </div>
+
+      {songs.map((s) => {
+        const done = alreadyIn(s.title);
+        const loading = adding === s.title;
+        const isEditing = editing === s.id;
+
+        if (isEditing) return (
+          <div key={s.id} style={{background:'var(--surface2)',border:'2px solid var(--red)',borderRadius:'var(--r)',padding:12,marginBottom:8}}>
+            <div className="fg">
+              <label className="fl">Title</label>
+              <input value={editVals.title} onChange={e => setEditVals(v => ({...v,title:e.target.value}))} />
+            </div>
+            <div className="fg">
+              <label className="fl">Artist</label>
+              <input value={editVals.artist} onChange={e => setEditVals(v => ({...v,artist:e.target.value}))} />
+            </div>
+            <div className="fg">
+              <label className="fl">Singer / Performer</label>
+              <input value={editVals.singer} onChange={e => setEditVals(v => ({...v,singer:e.target.value}))} />
+            </div>
+            <div className="fg">
+              <label className="fl">Notes</label>
+              <input value={editVals.notes} onChange={e => setEditVals(v => ({...v,notes:e.target.value}))} />
+            </div>
+            <div style={{display:'flex',gap:16,marginBottom:12}}>
+              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:14,cursor:'pointer'}}>
+                <input type="checkbox" checked={editVals.bandOnly} onChange={e => setEditVals(v => ({...v,bandOnly:e.target.checked}))} /> Band only
+              </label>
+              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:14,cursor:'pointer'}}>
+                <input type="checkbox" checked={editVals.encore} onChange={e => setEditVals(v => ({...v,encore:e.target.checked}))} /> Encore
+              </label>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-s btn-sm" style={{flex:1}} onClick={() => saveEdit(s.id)}>Save</button>
+              <button className="btn btn-g btn-sm" style={{flex:1}} onClick={() => setEditing(null)}>Cancel</button>
+            </div>
+          </div>
+        );
+
+        return (
+          <div key={s.id} style={{
+            background: done ? 'var(--surface)' : 'var(--surface2)',
+            border: `2px solid ${done ? '#1a5c2a' : 'var(--border)'}`,
+            borderRadius:'var(--r)',
+            padding:'12px',
+            marginBottom:'6px',
+            display:'flex',
+            alignItems:'center',
+            gap:10,
+            opacity: done ? 0.5 : 1,
+          }}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:800,fontSize:15}}>
+                {s.title}
+                {s.bandOnly && <span className="tag tag-b">Band</span>}
+                {s.encore && <span className="tag tag-e">Encore</span>}
+              </div>
+              <div style={{fontSize:12,color:'var(--text-dim)',fontWeight:600}}>{s.artist}</div>
+              {s.singer && <div style={{fontSize:13,color:'var(--amber)',fontWeight:800}}>🎤 {s.singer}</div>}
+              {s.notes && <div className="note">{s.notes}</div>}
+            </div>
+            <div style={{display:'flex',gap:6,flexShrink:0}}>
+              {!done && <button className="btn btn-g btn-sm btn-ic" onClick={() => startEdit(s)}>✏️</button>}
+              {!done && <button className="btn btn-d btn-sm btn-ic" onClick={() => removeRow(s.id)}>✕</button>}
+              <button
+                className={`btn btn-sm ${done ? 'btn-g' : 'btn-s'}`}
+                onClick={() => addSong(s)}
+                disabled={done || loading}
+              >
+                {loading ? '...' : done ? '✓' : 'Add'}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ── SONG MANAGER ──────────────────────────────────────────────────────────────
+// Admin can toggle songs on/off for the public list, and mark band-only
+function SongManager({ songs, songsError }) {
+  const [filter, setFilter] = useState('');
+  const [importMsg, setImportMsg] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef(null);
+
+  const filtered = filter.length > 1
+    ? songs.filter(s => s.title.toLowerCase().includes(filter.toLowerCase()) || s.artist.toLowerCase().includes(filter.toLowerCase()))
+    : songs;
+
+  async function toggleHidden(s) {
+    const { error } = await sb.from('songs').update({ hidden: !s.hidden }).eq('id', s.id);
+    if (error) alert('Could not update: ' + error.message);
+  }
+  async function toggleBand(s) {
+    const { error } = await sb.from('songs').update({ band_only: !s.bandOnly }).eq('id', s.id);
+    if (error) alert('Could not update: ' + error.message);
+  }
+
+  async function handleCSV(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImporting(true);
+    setImportMsg('');
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text).filter(r => r.length >= 1 && r[0] && r[0].trim());
+      // first row is the header (Title,Artist,...) — skip it
+      const dataRows = rows.slice(1);
+      const existingByTitle = new Map(songs.map(s => [s.title, s]));
+      const toInsert = [];
+      const toUpdate = [];
+      for (const r of dataRows) {
+        const title = (r[0] || '').trim();
+        const artist = (r[1] || '').trim();
+        if (!title) continue;
+        const existing = existingByTitle.get(title);
+        if (existing) {
+          if (artist && artist !== existing.artist) toUpdate.push({ id: existing.id, artist });
+        } else {
+          toInsert.push({ title, artist });
+        }
+      }
+      let insertError = null;
+      if (toInsert.length) {
+        const res = await sb.from('songs').insert(toInsert);
+        insertError = res.error;
+      }
+      if (insertError) {
+        setImportMsg('Import failed: ' + insertError.message);
+      } else {
+        for (const u of toUpdate) await sb.from('songs').update({ artist: u.artist }).eq('id', u.id);
+        setImportMsg(`Added ${toInsert.length} new, updated ${toUpdate.length} artist name${toUpdate.length === 1 ? '' : 's'}. Nothing was removed or re-hidden.`);
+      }
+    } catch (err) {
+      setImportMsg('Could not read that file: ' + err.message);
+    }
+    setImporting(false);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  const visible = songs.filter(s => !s.hidden && !s.bandOnly).length;
+
+  return (
+    <div>
+      <div className="card" style={{marginBottom:8}}>
+        <div className="card-title">Song List</div>
+        {songsError ? (
+          <div className="note" style={{color:'var(--red)',fontStyle:'normal',marginBottom:12}}>
+            Could not load songs: {songsError}
+          </div>
+        ) : (
+          <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:12}}>
+            {songs.length} songs loaded, {visible} visible to the public. Toggle to hide or mark as band-only.
+          </div>
+        )}
+        <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter songs..." style={{marginBottom:10}} />
+        <input ref={fileRef} type="file" accept=".csv" style={{display:'none'}} onChange={handleCSV} />
+        <button className="btn btn-g btn-full" disabled={importing} onClick={() => fileRef.current.click()}>
+          {importing ? 'Importing…' : 'Import CSV from OnSong'}
+        </button>
+        {importMsg && <div className="note" style={{marginTop:8}}>{importMsg}</div>}
+      </div>
+
+      {filtered.map((s) => {
+        const isHidden = s.hidden || false;
+        const isBand = s.bandOnly || false;
+        return (
+          <div key={s.id} style={{
+            background: isHidden || isBand ? 'var(--surface)' : 'var(--surface2)',
+            border: '2px solid var(--border)',
+            borderRadius: 'var(--r)',
+            padding: '12px 14px',
+            marginBottom: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            opacity: isHidden ? 0.45 : 1,
+          }}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:800,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                {s.title}
+              </div>
+              <div style={{fontSize:12,color:'var(--text-dim)',fontWeight:600}}>{s.artist}</div>
+            </div>
+            <div style={{display:'flex',gap:6,flexShrink:0}}>
+              <button
+                className="btn btn-sm btn-g"
+                onClick={() => openInOnSong(s.title)}
+                title="Open this song in OnSong to check it matches"
+              >
+                Test
+              </button>
+              <button
+                className={`btn btn-sm ${isHidden ? 'btn-d' : 'btn-g'}`}
+                onClick={() => toggleHidden(s)}
+                title={isHidden ? 'Show to public' : 'Hide from public'}
+              >
+                {isHidden ? 'Hidden' : 'Visible'}
+              </button>
+              <button
+                className={`btn btn-sm ${isBand ? 'btn-a' : 'btn-g'}`}
+                onClick={() => toggleBand(s)}
+                title={isBand ? 'Mark as karaoke' : 'Mark as band-only'}
+              >
+                {isBand ? 'Band' : 'Karaoke'}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── BAND VIEW ─────────────────────────────────────────────────────────────────
+function BandView({ np }) {
+  const [next, setNext] = useState([]);
+
+  useEffect(() => { fetchNext(); }, []);
+  useRealtime('playlist', fetchNext);
+
+  async function fetchNext() {
+    const { data } = await sb.from('playlist').select('*').eq('status','queued').order('position').limit(10);
+    setNext(data || []);
+  }
+
+  const queued = next.sort((a,b) => a.position - b.position);
+  const minPos = () => queued.length > 0 ? Math.min(...queued.map(p => p.position)) : 1;
+  const maxPos = () => queued.length > 0 ? Math.max(...queued.map(p => p.position)) : 0;
+
+  async function playNext(item) {
+    await sb.from('playlist').update({position: minPos() - 1}).eq('id', item.id);
+    fetchNext();
+  }
+
+  async function skip(item) {
+    await sb.from('playlist').update({status:'removed'}).eq('id', item.id);
+    fetchNext();
+  }
+
+  async function bump(item) {
+    const idx = queued.findIndex(p => p.id === item.id);
+    const targetIdx = Math.min(idx + 5, queued.length - 1);
+    const target = queued[targetIdx];
+    if (!target || target.id === item.id) return;
+    const fromPos = item.position;
+    const toPos = target.position;
+    await sb.from('playlist').update({position: toPos}).eq('id', item.id);
+    await sb.from('playlist').update({position: fromPos}).eq('id', target.id);
+    fetchNext();
+  }
+
+  async function toEncore(item) {
+    await sb.from('playlist').update({position: maxPos() + 100, source: 'encore'}).eq('id', item.id);
+    fetchNext();
+  }
+
+  async function setNow(item) {
+    await sb.from('playlist').update({status:'done'}).eq('status','playing');
+    await sb.from('playlist').update({status:'playing'}).eq('id', item.id);
+    await sb.from('app_state').upsert({id:1, now_playing_song:item.song_title, now_playing_artist:item.artist, now_playing_singer:item.singer_name});
+    openInOnSong(item.song_title);
+    fetchNext();
+  }
+
+  return (
+    <div className="main" style={{paddingTop:20}}>
+      <div className="bc">
+        <div className="bc-label">Now Playing</div>
+        {np && np.song
+          ? <><div className="bc-song">{np.song}</div><div className="bc-artist">{np.artist}</div>{np.singer && <div className="bc-singer">🎤 {np.singer}</div>}</>
+          : <div style={{color:'var(--text-muted)',fontSize:18}}>Nothing yet</div>}
+      </div>
+      {queued.slice(0,6).map((item,i) => (
+        <div className="bn" key={item.id} style={{flexDirection:'column',alignItems:'flex-start',gap:8}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,width:'100%'}}>
+            <div className="bn-num">{i+1}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div className="bn-song">
+                {item.song_title}
+                {item.source==='encore' && <span className="tag tag-e">Encore</span>}
+                {item.is_band_only && <span className="tag tag-b">Band</span>}
+              </div>
+              <div className="bn-artist">{item.artist}</div>
+              {item.singer_name && <div className="bn-singer">🎤 {item.singer_name}</div>}
+              {item.notes && <div className="note" style={{marginTop:2}}>{item.notes}</div>}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:6,paddingLeft:44,flexWrap:'wrap'}}>
+            <button className="btn btn-p btn-sm" onClick={() => setNow(item)}>▶ Play Now</button>
+            <button className="btn btn-g btn-sm" onClick={() => playNext(item)}>⬆ Next</button>
+            <button className="btn btn-g btn-sm" onClick={() => bump(item)}>↓5</button>
+            <button className="btn btn-a btn-sm" onClick={() => toEncore(item)}>Encore</button>
+            <button className="btn btn-d btn-sm" onClick={() => skip(item)}>Skip</button>
+          </div>
+        </div>
+      ))}
+      {queued.length === 0 && <div className="empty">Playlist is empty</div>}
+    </div>
+  );
+}
+
+// ── ROOT ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [view, setView] = useState('public');
+  const [adminOk, setAdminOk] = useState(false);
+  const [bandOk, setBandOk] = useState(false);
+  const [np, setNp] = useState(null);
+  const [songs, setSongs] = useState([]);
+  const [songsError, setSongsError] = useState(null);
+
+  useEffect(() => { fetchNp(); fetchSongs(); }, []);
+  useRealtime('app_state', fetchNp);
+  useRealtime('songs', fetchSongs);
+
+  async function fetchNp() {
+    const { data } = await sb.from('app_state').select('*').eq('id',1).single();
+    if (data) setNp({ song:data.now_playing_song, artist:data.now_playing_artist, singer:data.now_playing_singer });
+  }
+
+  async function fetchSongs() {
+    const { data, error } = await sb.from('songs').select('*').order('title');
+    setSongsError(error ? error.message : null);
+    setSongs((data || []).map(s => ({
+      id: s.id, title: s.title, artist: s.artist,
+      hidden: s.hidden, bandOnly: s.band_only, encore: s.encore, notes: s.notes,
+    })));
+  }
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <div className="topbar-left">
+          <div className="topbar-title">LIVE KARAOKE</div>
+          {view !== 'public' && <button className="btn btn-g btn-sm" onClick={() => setView('public')}>← Back</button>}
+        </div>
+        <div className="topbar-now">
+          <div className={`np-dot${np && np.song ? '' : ' off'}`} />
+          {np && np.song
+            ? <span className="topbar-now-text">{np.song} <span className="topbar-now-artist">· {np.artist}{np.singer ? ` • ${np.singer}` : ''}</span></span>
+            : <span className="topbar-now-text off">Nothing playing</span>}
+        </div>
+        <div className="badge">{view === 'admin' ? 'ADMIN' : view === 'band' ? 'BAND' : 'LIVE'}</div>
+      </div>
+
+      {view === 'public' && <>
+        <PublicView np={np} songs={songs} />
+        <div style={{display:'flex',gap:12,padding:'16px',justifyContent:'center'}}>
+          <button className="btn btn-g" style={{flex:1,maxWidth:160,padding:'16px',fontSize:16}} onClick={() => setView('admin')}>Admin</button>
+          <button className="btn btn-g" style={{flex:1,maxWidth:160,padding:'16px',fontSize:16}} onClick={() => setView('band')}>Band</button>
+        </div>
+      </>}
+
+      {view === 'admin' && !adminOk && <PinScreen role="admin" onSuccess={() => setAdminOk(true)} />}
+      {view === 'admin' && adminOk && <AdminView songs={songs} songsError={songsError} />}
+
+      {view === 'band' && !bandOk && <PinScreen role="band" onSuccess={() => setBandOk(true)} />}
+      {view === 'band' && bandOk && <BandView np={np} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

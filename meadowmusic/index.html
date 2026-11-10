@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chesham United Festival — Control</title>
+<style>
+:root{
+  --bg:#14171c;
+  --panel:#1b1f26;
+  --panel2:#20252d;
+  --border:#2a2f38;
+  --text:#e8eaed;
+  --muted:#8b93a1;
+  --accent:#f2a93b;
+  --danger:#e2574c;
+  --success:#4caf7d;
+  --mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;}
+#app{display:flex;min-height:100vh;}
+#sidebar{width:220px;background:var(--panel);border-right:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;}
+#brand{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
+#brand .name{font-weight:700;font-size:15px;letter-spacing:0.02em;}
+#brand .sub{color:var(--muted);font-size:11px;margin-top:2px;text-transform:uppercase;letter-spacing:0.08em;}
+nav{flex:1;overflow-y:auto;padding:10px 0;}
+nav button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--muted);padding:9px 16px;text-align:left;font-size:12.5px;cursor:pointer;border-left:3px solid transparent;}
+nav button:hover{color:var(--text);background:var(--panel2);}
+nav button.active{color:var(--text);background:var(--panel2);border-left-color:var(--accent);font-weight:600;}
+#healthbar{padding:14px 16px;border-top:1px solid var(--border);}
+#healthbar .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+#healthbar .figure{font-family:var(--mono);font-size:19px;font-weight:600;}
+#healthbar .sub{font-size:11px;color:var(--muted);margin-top:2px;}
+#iobar{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
+#iobar button{flex:1;font-size:11px;padding:6px 4px;}
+#main{flex:1;padding:28px 34px;max-width:1180px;}
+h1{font-size:20px;margin:0 0 4px;}
+h2{font-size:15px;margin:26px 0 10px;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:6px;}
+.pageDesc{color:var(--muted);font-size:12.5px;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+th{text-align:left;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;padding:6px 6px;border-bottom:1px solid var(--border);}
+td{padding:4px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:hover td{background:var(--panel2);}
+input, select, textarea{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:6px 7px;border-radius:5px;font-size:12.5px;font-family:var(--sans);width:100%;}
+input[type=number]{font-family:var(--mono);}
+textarea{min-height:70px;resize:vertical;}
+button.btn{background:var(--accent);color:#1a1305;border:none;padding:7px 14px;border-radius:5px;font-weight:600;font-size:12.5px;cursor:pointer;}
+button.btn:hover{filter:brightness(1.08);}
+button.btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+button.icon{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px;}
+button.icon:hover{color:var(--danger);}
+.row-actions{white-space:nowrap;width:32px;}
+.mono{font-family:var(--mono);}
+.right{text-align:right;}
+.muted{color:var(--muted);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;}
+.card .kpi{font-family:var(--mono);font-size:24px;font-weight:700;}
+.card .kpiLabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;}
+.pos{color:var(--success);} .neg{color:var(--danger);}
+.addRow{margin-top:6px;}
+.saveNote{font-size:11px;color:var(--muted);margin-top:4px;height:14px;}
+.status-pill{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;display:inline-block;}
+.status-green{background:rgba(76,175,125,0.15);color:var(--success);}
+.status-amber{background:rgba(242,169,59,0.15);color:var(--accent);}
+.status-red{background:rgba(226,87,76,0.15);color:var(--danger);}
+::placeholder{color:#565d6b;}
+.stageHead{font-size:9.5px;letter-spacing:0.04em;}
+.plTable td, .plTable th{padding:8px 10px;}
+.plTable th.stage{text-align:right;}
+.plTable td.stage{text-align:right;font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="brand">
+      <div class="name" id="brand-name-live">Chesham Fest</div>
+      <div class="sub">Event Control</div>
+    </div>
+    <nav id="nav"></nav>
+    <div id="healthbar">
+      <div class="label">Net Position (Actual)</div>
+      <div class="figure" id="hb-figure">£0</div>
+      <div class="sub" id="hb-sub">loading...</div>
+      <div class="sub" id="syncStatus" style="margin-top:6px;">Connecting…</div>
+    </div>
+    <div id="iobar">
+      <button class="btn secondary" id="refreshBtn">↻ Refresh</button>
+      <button class="btn secondary" id="exportBtn">Export</button>
+      <button class="btn secondary" id="importBtn">Import</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+    </div>
+  </div>
+  <div id="main"></div>
+</div>
+
+<script>
+const PAGES = [
+  {id:'overview', label:'Overview & P&L', icon:'◆'},
+  {id:'budget', label:'Budget', icon:'£'},
+  {id:'artists', label:'Artist Fees', icon:'♪'},
+  {id:'ticketing', label:'Ticketing', icon:'🎟'},
+  {id:'income', label:'Other Income & Breakeven', icon:'∑'},
+  {id:'catering', label:'Catering & Crew Meals', icon:'⚘'},
+  {id:'staffing', label:'Crew & Staffing', icon:'☰'},
+  {id:'merch', label:'Merch', icon:'▤'},
+  {id:'contacts', label:'Contacts', icon:'@'},
+  {id:'schedule', label:'Schedule', icon:'▦'},
+  {id:'advancing', label:'Production Advancing', icon:'▶'},
+  {id:'sitemap', label:'Site Map', icon:'⌗'},
+  {id:'eventcontrol', label:'Event Control', icon:'⚑'},
+  {id:'healthsafety', label:'Health & Safety', icon:'✚'},
+];
+
+const BUDGET_GROUPS = ['Production','Site','Marketing & Digital','Event Management','Licensing','Contingency'];
+
+function cid(){ return Math.random().toString(36).slice(2,10); }
+
+const DEFAULT_DATA = {
+  eventName: 'Chesham United Festival',
+  days: 5,
+  budget: {
+    categories: [
+      {id:cid(), name:'Artist Fees', group:'Production', estimate:0, quoted:0, actual:0, linked:'artists'},
+      {id:cid(), name:'Production (staging, at cost)', group:'Production', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Sound, Lighting & Video (AV Production)', group:'Production', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Trucking', group:'Production', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Crew', group:'Production', estimate:0, quoted:0, actual:0, linked:'staffing'},
+      {id:cid(), name:'Catering', group:'Production', estimate:0, quoted:0, actual:0, linked:'catering'},
+      {id:cid(), name:'Accommodation', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Generators & Power', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Welfare & First Aid', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Toilets & Waste', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Fencing & Barriers', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Box Office / Wristbanding / Cash Handling', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Ticketing Platform & Card Processing Fees', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Signage & Wayfinding', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Artist Hospitality & Dressing Rooms', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Crew Transport / Shuttle', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Accessibility Provision', group:'Site', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Marketing & Advertising', group:'Marketing & Digital', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Website & Digital Presence', group:'Marketing & Digital', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Social Media / Content Creation', group:'Marketing & Digital', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Site WiFi & IT/Comms', group:'Marketing & Digital', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Security', group:'Event Management', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Policing', group:'Event Management', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Traffic Management', group:'Event Management', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Accreditation / Passes & Laminates', group:'Event Management', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Noise Control / Monitoring', group:'Event Management', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Local Authority / Licensing', group:'Licensing', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'PRS / Music Licensing', group:'Licensing', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Insurance', group:'Contingency', estimate:0, quoted:0, actual:0},
+      {id:cid(), name:'Weather Contingency', group:'Contingency', estimate:0, quoted:0, actual:0},
+    ]
+  },
+  artists: [],
+  ticketTiers: [],
+  ticketDays: [
+    {id:cid(), name:'Day 1', capacity:1000},
+    {id:cid(), name:'Day 2', capacity:1000},
+  ],
+  projectedSellThrough: 70,
+  otherIncome: [],
+  merch: [],
+  staffing: [
+    {id:cid(), role:'Production Manager (Jay)', days:'All days', numDays:5, headcount:1, rateEstimate:0, rateQuoted:0, rateActual:0, notes:'Free of charge — expenses only'},
+    {id:cid(), role:'Stage Manager (Tyler)', days:'All days', numDays:5, headcount:1, rateEstimate:0, rateQuoted:0, rateActual:0, notes:''},
+    {id:cid(), role:'Audio Crew', days:'Get-in to load-out', numDays:5, headcount:2, rateEstimate:0, rateQuoted:0, rateActual:0, notes:'Covers changeovers'},
+    {id:cid(), role:'Lighting Crew', days:'Get-in to load-out', numDays:5, headcount:2, rateEstimate:0, rateQuoted:0, rateActual:0, notes:'Covers changeovers'},
+    {id:cid(), role:'Stagehands', days:'Full duration', numDays:5, headcount:4, rateEstimate:0, rateQuoted:0, rateActual:0, notes:'Load-in, changeovers, load-out'},
+  ],
+  cateringSettings: {
+    breakfast:{estimate:0,quoted:0,actual:0},
+    lunch:{estimate:0,quoted:0,actual:0},
+    dinner:{estimate:0,quoted:0,actual:0}
+  },
+  cateringDays: [
+    {id:cid(), day:'Production Day 1', headcount:0, breakfast:false, lunch:true, dinner:true, notes:'Crew only'},
+    {id:cid(), day:'Production Day 2', headcount:0, breakfast:true, lunch:true, dinner:true, notes:'Crew only'},
+    {id:cid(), day:'Friday Show', headcount:0, breakfast:true, lunch:true, dinner:true, notes:'Crew + artists'},
+    {id:cid(), day:'Saturday Show', headcount:0, breakfast:true, lunch:true, dinner:true, notes:'Crew + artists'},
+    {id:cid(), day:'Sunday Load-out', headcount:0, breakfast:true, lunch:true, dinner:false, notes:'Crew only'},
+  ],
+  contacts: [],
+  schedule: [],
+  advancing: [],
+  sitemapNotes: '',
+  eventControlLog: [],
+  healthSafety: []
+};
+
+let data = null;
+let currentPage = 'overview';
+let saveTimer = null;
+const SUPABASE_URL = 'https://hmtqjljbiheckqeenbbb.supabase.co/rest/v1/';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtdHFqbGpiaWhlY2txZWVuYmJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNTE1MTksImV4cCI6MjEwMDgyNzUxOX0.WZ20CycKJQ9kXg5kq9R49I9c35xov0LjWpOT0NlEDUA';
+const ROW_ID = 'main';
+const LOCAL_BACKUP_KEY = 'chesham-festival-plan-backup';
+
+function supabaseHeaders(extra={}){
+  return Object.assign({
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer '+SUPABASE_KEY,
+    'Content-Type': 'application/json'
+  }, extra);
+}
+
+async function loadData(){
+  setSyncStatus('Loading…');
+  try{
+    const res = await fetch(`${SUPABASE_URL}festival_plan?id=eq.${ROW_ID}&select=data`, {headers: supabaseHeaders()});
+    if(!res.ok) throw new Error('fetch failed '+res.status);
+    const json = await res.json();
+    if(json && json.length>0 && json[0].data){
+      data = json[0].data;
+      setSyncStatus('Synced');
+    } else {
+      data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+      await saveNow();
+      setSyncStatus('Synced');
+    }
+  }catch(e){
+    console.error('load failed, falling back to local backup', e);
+    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
+    data = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_DATA));
+    setSyncStatus('Offline — using local backup');
+  }
+  migrateData();
+  render();
+}
+
+function migrateData(){
+  if(!data.ticketDays) data.ticketDays = JSON.parse(JSON.stringify(DEFAULT_DATA.ticketDays));
+  if(data.projectedSellThrough===undefined) data.projectedSellThrough = 70;
+  if(!data.otherIncome) data.otherIncome = [];
+  if(!data.artists) data.artists = [];
+  if(!data.cateringSettings || data.cateringSettings.breakfastCost!==undefined){
+    data.cateringSettings = JSON.parse(JSON.stringify(DEFAULT_DATA.cateringSettings));
+  }
+  if(!data.cateringDays) data.cateringDays = [];
+  (data.ticketTiers||[]).forEach(t=>{
+    if(t.allocation===undefined){
+      let matchDay = data.ticketDays.find(d=>d.name===t.day);
+      if(!matchDay && t.day){ matchDay = {id:cid(), name:t.day, capacity:Number(t.capacity)||0}; data.ticketDays.push(matchDay); }
+      t.dayId = matchDay ? matchDay.id : (data.ticketDays[0] && data.ticketDays[0].id);
+      t.allocation = t.capacity!==undefined ? t.capacity : 0;
+    }
+    if(!t.dayIds){ t.dayIds = t.dayId ? [t.dayId] : []; }
+  });
+  (data.budget.categories||[]).forEach(cat=>{
+    if(cat.estimate===undefined){
+      cat.estimate = cat.budgeted!==undefined ? cat.budgeted : 0;
+      cat.quoted = cat.estimate;
+      if(cat.actual===undefined) cat.actual = 0;
+    }
+    if(!cat.group){
+      const defaultMatch = DEFAULT_DATA.budget.categories.find(d=>d.name===cat.name);
+      cat.group = defaultMatch ? defaultMatch.group : 'Production';
+    }
+  });
+  DEFAULT_DATA.budget.categories.forEach(defCat=>{
+    const exists = data.budget.categories.some(c=>c.name===defCat.name);
+    if(!exists){
+      data.budget.categories.push({id:cid(), name:defCat.name, group:defCat.group, estimate:0, quoted:0, actual:0, linked:defCat.linked});
+    }
+  });
+  (data.staffing||[]).forEach(s=>{
+    if(s.rateEstimate===undefined){
+      const r = Number(s.rate)||0;
+      s.rateEstimate = r; s.rateQuoted = r; s.rateActual = r;
+    }
+  });
+}
+
+async function saveNow(){
+  try{
+    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(data));
+  }catch(e){ /* ignore local backup failure */ }
+  try{
+    const res = await fetch(`${SUPABASE_URL}festival_plan`, {
+      method:'POST',
+      headers: supabaseHeaders({'Prefer':'resolution=merge-duplicates'}),
+      body: JSON.stringify({id: ROW_ID, data: data, updated_at: new Date().toISOString()})
+    });
+    if(!res.ok) throw new Error('save failed '+res.status);
+    setSyncStatus('Synced');
+    return true;
+  }catch(e){
+    console.error('save failed', e);
+    setSyncStatus('Offline — saved locally only');
+    return false;
+  }
+}
+
+function save(noteEl){
+  clearTimeout(saveTimer);
+  setSyncStatus('Saving…');
+  saveTimer = setTimeout(async ()=>{
+    const ok = await saveNow();
+    if(noteEl){
+      const elx = document.getElementById(noteEl);
+      if(elx) elx.textContent = ok ? 'Saved' : 'Save failed — check connection';
+      if(ok) setTimeout(()=>{ if(elx) elx.textContent=''; }, 1200);
+    }
+    updateHealthbar();
+  }, 400);
+}
+function setSyncStatus(text){
+  const s = document.getElementById('syncStatus');
+  if(s) s.textContent = text;
+}
+
+function fmt(n){ n = Number(n)||0; return '£' + n.toLocaleString('en-GB', {maximumFractionDigits:0}); }
+
+/* ---- Budget aggregates (three stages) ---- */
+function totalBudgetStage(stage){ return data.budget.categories.reduce((s,c)=>s+(Number(c[stage])||0),0); }
+
+/* ---- Artist fees ---- */
+function artistTotalStage(stage){ return data.artists.reduce((s,a)=>s+(Number(a[stage])||0),0); }
+
+/* ---- Crew ---- */
+function crewCost(s, stage){ return (Number(s.headcount)||0)*(Number(s.numDays)||0)*(Number(s['rate'+cap1(stage)])||0); }
+function cap1(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function totalCrewStage(stage){ return data.staffing.reduce((sum,s)=>sum+crewCost(s,stage),0); }
+
+/* ---- Catering ---- */
+function cateringRowCost(row, stage){
+  const cs = data.cateringSettings;
+  let mealCost = 0;
+  if(row.breakfast) mealCost += Number(cs.breakfast[stage])||0;
+  if(row.lunch) mealCost += Number(cs.lunch[stage])||0;
+  if(row.dinner) mealCost += Number(cs.dinner[stage])||0;
+  return mealCost * (Number(row.headcount)||0);
+}
+function totalCateringStage(stage){ return data.cateringDays.reduce((s,r)=>s+cateringRowCost(r,stage),0); }
+
+/* ---- Ticketing ---- */
+function ticketRevenue(){ return data.ticketTiers.reduce((s,t)=>s+((Number(t.price)||0)*(Number(t.sold)||0)),0); }
+function ticketPotentialRevenue(){ return data.ticketTiers.reduce((s,t)=>s+((Number(t.price)||0)*(Number(t.allocation)||0)),0); }
+function ticketProjectedRevenue(pct){ return data.ticketTiers.reduce((s,t)=>s+((Number(t.price)||0)*(Number(t.allocation)||0)*(Number(pct)||0)/100),0); }
+function dayAllocated(dayId){ return data.ticketTiers.filter(t=>(t.dayIds||[]).includes(dayId)).reduce((s,t)=>s+(Number(t.allocation)||0),0); }
+function totalDayCapacity(){ return data.ticketDays.reduce((s,d)=>s+(Number(d.capacity)||0),0); }
+function totalAllocated(){ return data.ticketTiers.reduce((s,t)=>s+(Number(t.allocation)||0),0); }
+
+/* ---- Other income ---- */
+function otherIncomeStage(stage){ return data.otherIncome.reduce((s,o)=>s+(Number(o[stage])||0),0); }
+function merchRevenue(){ return data.merch.reduce((s,m)=>s+((Number(m.price)||0)*(Number(m.sold)||0)),0); }
+
+/* ---- Overall P&L by stage ----
+   Estimate: projected ticket revenue at sell-through % + other income estimate + merch revenue (actual sold, since merch has no separate stages)
+   Quoted:   ticket potential (full sell-out of current allocations) + other income quoted
+   Actual:   real ticket revenue sold + other income actual + merch revenue
+*/
+function revenueStage(stage){
+  if(stage==='estimate') return ticketProjectedRevenue(data.projectedSellThrough) + otherIncomeStage('estimate') + merchRevenue();
+  if(stage==='quoted') return ticketPotentialRevenue() + otherIncomeStage('quoted') + merchRevenue();
+  return ticketRevenue() + otherIncomeStage('actual') + merchRevenue();
+}
+function costsStage(stage){ return totalBudgetStage(stage); }
+function netStage(stage){ return revenueStage(stage) - costsStage(stage); }
+
+function avgTicketPrice(){
+  const withPrice = data.ticketTiers.filter(t=>Number(t.price)>0);
+  if(withPrice.length===0) return 0;
+  return withPrice.reduce((s,t)=>s+(Number(t.price)||0),0)/withPrice.length;
+}
+function costsToCover(){ return costsStage('actual') - (merchRevenue()+otherIncomeStage('actual')); }
+function breakevenTickets(){
+  const avg = avgTicketPrice();
+  if(avg<=0) return 0;
+  return Math.max(0, Math.ceil(costsToCover()/avg));
+}
+
+function updateHealthbar(){
+  const net = netStage('actual');
+  const fig = document.getElementById('hb-figure');
+  const sub = document.getElementById('hb-sub');
+  fig.textContent = fmt(net);
+  fig.className = 'figure ' + (net>=0?'pos':'neg');
+  sub.textContent = `${fmt(revenueStage('actual'))} in · ${fmt(costsStage('actual'))} spent`;
+}
+
+function render(){
+  renderNav();
+  renderPage();
+  updateHealthbar();
+  const bn = document.getElementById('brand-name-live'); if(bn) bn.textContent = data.eventName || 'Chesham Fest';
+}
+function renderNav(){
+  const nav = document.getElementById('nav');
+  nav.innerHTML = '';
+  PAGES.forEach(p=>{
+    const b = document.createElement('button');
+    b.className = p.id===currentPage ? 'active' : '';
+    b.innerHTML = `<span>${p.icon}</span><span>${p.label}</span>`;
+    b.onclick = ()=>{ currentPage = p.id; render(); };
+    nav.appendChild(b);
+  });
+}
+function renderPage(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  const renderers = {
+    overview: pageOverview, budget: pageBudget, artists: pageArtists,
+    ticketing: pageTicketing, income: pageIncome, catering: pageCatering,
+    staffing: pageStaffing, merch: pageMerch, contacts: pageContacts,
+    schedule: pageSchedule, advancing: pageAdvancing, sitemap: pageSitemap,
+    eventcontrol: pageEventControl, healthsafety: pageHealthSafety
+  };
+  renderers[currentPage](main);
+}
+function el(tag, attrs={}, children=[]){
+  const e = document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v])=>{
+    if(k==='html') e.innerHTML = v;
+    else if(k==='text') e.textContent = v;
+    else if(k.startsWith('on')) e[k]=v;
+    else e.setAttribute(k,v);
+  });
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function labeled(label, inputEl){
+  const wrap = el('div');
+  wrap.appendChild(el('div',{class:'muted',style:'font-size:11px;margin-bottom:4px;',text:label}));
+  wrap.appendChild(inputEl);
+  return wrap;
+}
+
+/* ================= OVERVIEW & P&L ================= */
+function pageOverview(main){
+  main.appendChild(el('h1',{text:data.eventName}));
+  main.appendChild(el('div',{class:'pageDesc',text:`Multi-day festival at Chesham United FC · ${data.days} days`}));
+
+  main.appendChild(el('h2',{text:'Event details'}));
+  const form = el('div',{class:'card'});
+  const nameInput = el('input',{value:data.eventName});
+  nameInput.oninput = ()=>{ data.eventName = nameInput.value; save('ov-note'); document.getElementById('brand-name-live').textContent = nameInput.value; document.querySelector('#main h1').textContent = nameInput.value; };
+  const daysInput = el('input',{type:'number',value:data.days});
+  daysInput.oninput = ()=>{ data.days = daysInput.value; save('ov-note'); };
+  const row = el('div',{style:'display:grid;grid-template-columns:2fr 1fr;gap:14px;'});
+  row.appendChild(labeled('Event name', nameInput));
+  row.appendChild(labeled('Number of days', daysInput));
+  form.appendChild(row);
+  form.appendChild(el('div',{class:'saveNote',id:'ov-note'}));
+  main.appendChild(form);
+
+  main.appendChild(el('h2',{text:'Estimated P&L'}));
+  main.appendChild(el('div',{class:'pageDesc',style:'margin-bottom:8px;',text:'Estimate = projected at current sell-through % and cost estimates. Quoted = confirmed offers/allocations, not yet paid. Actual = money actually in or out. This is the feasibility check.'}));
+  const plTable = el('table',{class:'plTable'});
+  plTable.appendChild(el('tr',{html:'<th>Line</th><th class="stage">Estimate</th><th class="stage">Quoted</th><th class="stage">Actual</th>'}));
+  const rows = [
+    ['Revenue', revenueStage('estimate'), revenueStage('quoted'), revenueStage('actual')],
+    ['Costs', costsStage('estimate'), costsStage('quoted'), costsStage('actual')],
+  ];
+  rows.forEach(([label,e1,e2,e3])=>{
+    const tr = document.createElement('tr');
+    tr.appendChild(el('td',{text:label}));
+    tr.appendChild(el('td',{class:'stage mono',text:fmt(e1)}));
+    tr.appendChild(el('td',{class:'stage mono',text:fmt(e2)}));
+    tr.appendChild(el('td',{class:'stage mono',text:fmt(e3)}));
+    plTable.appendChild(tr);
+  });
+  const netTr = document.createElement('tr');
+  netTr.style.fontWeight='700';
+  netTr.appendChild(el('td',{text:'Net P&L'}));
+  ['estimate','quoted','actual'].forEach(stage=>{
+    const v = netStage(stage);
+    netTr.appendChild(el('td',{class:'stage mono '+(v>=0?'pos':'neg'),text:fmt(v)}));
+  });
+  plTable.appendChild(netTr);
+  main.appendChild(plTable);
+
+  const feasible = netStage('estimate')>=0;
+  const feasCard = el('div',{class:'card',style:'max-width:560px;'});
+  feasCard.appendChild(el('div',{class:'kpiLabel',text:'Feasibility read (based on Estimate column)'}));
+  feasCard.appendChild(el('div',{style:'margin-top:6px;',text: feasible
+    ? `At current estimates this covers its costs, with ${fmt(netStage('estimate'))} of headroom.`
+    : `At current estimates this runs short by ${fmt(Math.abs(netStage('estimate')))}. Raise ticket price, sell-through %, or cut cost estimates to close the gap.`}));
+  main.appendChild(feasCard);
+
+  main.appendChild(el('h2',{text:'Key figures'}));
+  const grid = el('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;'});
+  [
+    ['Artist Fees (Actual)', fmt(artistTotalStage('actual'))],
+    ['Crew Cost (Actual)', fmt(totalCrewStage('actual'))],
+    ['Catering Cost (Actual)', fmt(totalCateringStage('actual'))],
+    ['Ticket Revenue (Actual)', fmt(ticketRevenue())],
+  ].forEach(([label,val])=>{
+    const c = el('div',{class:'card'});
+    c.appendChild(el('div',{class:'kpiLabel',text:label}));
+    c.appendChild(el('div',{class:'kpi',text:val}));
+    grid.appendChild(c);
+  });
+  main.appendChild(grid);
+}
+
+/* ================= BUDGET ================= */
+function pageBudget(main){
+  main.appendChild(el('h1',{text:'Budget'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Every cost line with Estimate, Quoted and Actual. Crew, Catering and Artist Fees pull their totals from their own tabs — use the push buttons there to sync.'}));
+
+  main.appendChild(el('h2',{text:'Ticket pricing (sliding scale)'}));
+  if(data.ticketTiers.length===0){
+    main.appendChild(el('div',{class:'muted',text:'No ticket tiers yet — set these on the Ticketing tab.'}));
+  } else {
+    const tt = el('table');
+    tt.appendChild(el('tr',{html:'<th>Tier</th><th>Access days</th><th class="right">Price</th><th class="right">Allocation</th><th class="right">Sold</th>'}));
+    data.ticketTiers.forEach(t=>{
+      const dayNames = (t.dayIds||[]).map(id=>{ const d=data.ticketDays.find(x=>x.id===id); return d?d.name:''; }).filter(Boolean).join(', ');
+      const tr = document.createElement('tr');
+      tr.appendChild(el('td',{text:t.name}));
+      tr.appendChild(el('td',{class:'muted',text:dayNames}));
+      tr.appendChild(el('td',{class:'right mono',text:fmt(t.price)}));
+      tr.appendChild(el('td',{class:'right mono',text:(Number(t.allocation)||0).toLocaleString()}));
+      tr.appendChild(el('td',{class:'right mono',text:(Number(t.sold)||0).toLocaleString()}));
+      tt.appendChild(tr);
+    });
+    main.appendChild(tt);
+  }
+
+  main.appendChild(el('h2',{text:'Cost categories'}));
+  main.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-bottom:8px;',text:'Grouped into Production, Site, Event Management, Licensing and Contingency. Change a category\'s group from the dropdown to move it.'}));
+
+  const groupsWithCats = BUDGET_GROUPS.map(g=>({group:g, cats: data.budget.categories.filter(c=>c.group===g)}));
+  const ungrouped = data.budget.categories.filter(c=>!BUDGET_GROUPS.includes(c.group));
+  if(ungrouped.length) groupsWithCats.push({group:'Other', cats:ungrouped});
+
+  groupsWithCats.forEach(({group, cats})=>{
+    const groupWrap = el('div',{style:'margin-bottom:22px;'});
+    const groupHeadRow = el('div',{style:'display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;'});
+    groupHeadRow.appendChild(el('div',{style:'font-weight:600;font-size:13px;',text:group}));
+    const subEst = cats.reduce((s,c)=>s+(Number(c.estimate)||0),0);
+    const subAct = cats.reduce((s,c)=>s+(Number(c.actual)||0),0);
+    groupHeadRow.appendChild(el('div',{class:'muted mono',style:'font-size:12px;',id:'grouptotal-'+group.replace(/\s+/g,''),text:`Est ${fmt(subEst)} · Actual ${fmt(subAct)}`}));
+    groupWrap.appendChild(groupHeadRow);
+
+    const table = el('table');
+    table.appendChild(el('tr',{html:'<th>Category</th><th>Group</th><th class="right">Estimate</th><th class="right">Quoted</th><th class="right">Actual</th><th class="right">Variance</th><th></th>'}));
+    cats.forEach(cat=>{
+      const tr = document.createElement('tr');
+      const nameInput = el('input',{value:cat.name});
+      nameInput.oninput = ()=>{ cat.name = nameInput.value; save('budget-note'); };
+      const groupSelect = el('select');
+      BUDGET_GROUPS.forEach(g=>{ const o=el('option',{value:g,text:g}); if(cat.group===g) o.selected=true; groupSelect.appendChild(o); });
+      groupSelect.onchange = ()=>{ cat.group = groupSelect.value; save('budget-note'); renderPage(); };
+      const estInput = el('input',{type:'number',value:cat.estimate});
+      estInput.oninput = ()=>{ cat.estimate = estInput.value; save('budget-note'); renderBudgetTotals(); };
+      const quotedInput = el('input',{type:'number',value:cat.quoted});
+      quotedInput.oninput = ()=>{ cat.quoted = quotedInput.value; save('budget-note'); renderBudgetTotals(); };
+      const actualInput = el('input',{type:'number',value:cat.actual});
+      actualInput.oninput = ()=>{ cat.actual = actualInput.value; save('budget-note'); renderBudgetTotals(); };
+      if(cat.linked){ [estInput,quotedInput,actualInput].forEach(i=>i.title='Linked to '+cat.linked+' tab — edit there and push, or override here.'); }
+      const variance = (Number(cat.estimate)||0)-(Number(cat.actual)||0);
+      const varTd = el('td',{class:'right mono '+(variance>=0?'pos':'neg'),text:fmt(variance)});
+      varTd.id = 'var-'+cat.id;
+      tr.appendChild(el('td',{},nameInput));
+      tr.appendChild(el('td',{},groupSelect));
+      tr.appendChild(el('td',{class:'right'},estInput));
+      tr.appendChild(el('td',{class:'right'},quotedInput));
+      tr.appendChild(el('td',{class:'right'},actualInput));
+      tr.appendChild(varTd);
+      const delBtn = el('button',{class:'icon',text:'✕'});
+      delBtn.onclick = ()=>{ data.budget.categories = data.budget.categories.filter(c=>c.id!==cat.id); save('budget-note'); renderPage(); };
+      tr.appendChild(el('td',{class:'row-actions'},delBtn));
+      table.appendChild(tr);
+    });
+    groupWrap.appendChild(table);
+    main.appendChild(groupWrap);
+  });
+
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add category'});
+  addBtn.onclick = ()=>{ data.budget.categories.push({id:cid(),name:'New category',group:'Production',estimate:0,quoted:0,actual:0}); save('budget-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'budget-note'}));
+
+  main.appendChild(el('h2',{text:'Totals'}));
+  const grid = el('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;'});
+  [
+    ['Total Estimate', fmt(totalBudgetStage('estimate')), 'kpi-est'],
+    ['Total Quoted', fmt(totalBudgetStage('quoted')), 'kpi-quo'],
+    ['Total Actual', fmt(totalBudgetStage('actual')), 'kpi-act'],
+    ['Net Position (Actual)', fmt(netStage('actual')), 'kpi-net'],
+  ].forEach(([label,val,idv])=>{
+    const c = el('div',{class:'card'});
+    c.appendChild(el('div',{class:'kpiLabel',text:label}));
+    const kpi = el('div',{class:'kpi',id:idv,text:val});
+    if(idv==='kpi-net') kpi.classList.add(netStage('actual')>=0?'pos':'neg');
+    c.appendChild(kpi);
+    grid.appendChild(c);
+  });
+  main.appendChild(grid);
+}
+function renderBudgetTotals(){
+  data.budget.categories.forEach(cat=>{
+    const v = document.getElementById('var-'+cat.id);
+    if(v){
+      const variance = (Number(cat.estimate)||0)-(Number(cat.actual)||0);
+      v.textContent = fmt(variance);
+      v.className = 'right mono '+(variance>=0?'pos':'neg');
+    }
+  });
+  const allGroups = BUDGET_GROUPS.concat(['Other']);
+  allGroups.forEach(group=>{
+    const cats = data.budget.categories.filter(c=> group==='Other' ? !BUDGET_GROUPS.includes(c.group) : c.group===group);
+    const t = document.getElementById('grouptotal-'+group.replace(/\s+/g,''));
+    if(t){
+      const subEst = cats.reduce((s,c)=>s+(Number(c.estimate)||0),0);
+      const subAct = cats.reduce((s,c)=>s+(Number(c.actual)||0),0);
+      t.textContent = `Est ${fmt(subEst)} · Actual ${fmt(subAct)}`;
+    }
+  });
+  const e1=document.getElementById('kpi-est'); if(e1) e1.textContent=fmt(totalBudgetStage('estimate'));
+  const e2=document.getElementById('kpi-quo'); if(e2) e2.textContent=fmt(totalBudgetStage('quoted'));
+  const e3=document.getElementById('kpi-act'); if(e3) e3.textContent=fmt(totalBudgetStage('actual'));
+  const n=document.getElementById('kpi-net'); if(n){ n.textContent=fmt(netStage('actual')); n.className='kpi '+(netStage('actual')>=0?'pos':'neg'); }
+}
+function pushToBudget(categoryName, stageValues){
+  const cat = data.budget.categories.find(c=>c.name===categoryName);
+  if(!cat) return;
+  cat.estimate = stageValues.estimate; cat.quoted = stageValues.quoted; cat.actual = stageValues.actual;
+}
+
+/* ================= ARTIST FEES ================= */
+function pageArtists(main){
+  main.appendChild(el('h1',{text:'Artist Fees'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Every act on the bill — cost, offer/quote, confirmation status. This dictates what you can spend on acts, and feeds Budget → Artist Fees.'}));
+
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Act</th><th>Day/Slot</th><th>Status</th><th class="right">Estimate</th><th class="right">Quoted/Offer</th><th class="right">Actual (confirmed)</th><th>Notes</th><th></th>'}));
+  data.artists.forEach(a=>{
+    const tr = document.createElement('tr');
+    const nameInput = el('input',{value:a.name||''}); nameInput.oninput=()=>{a.name=nameInput.value;save('artists-note');};
+    const dayInput = el('input',{value:a.day||''}); dayInput.oninput=()=>{a.day=dayInput.value;save('artists-note');};
+    const statusSelect = el('select');
+    ['Enquiry','Offered','Negotiating','Confirmed','Declined'].forEach(opt=>{
+      const o = el('option',{value:opt,text:opt});
+      if(a.status===opt) o.selected=true;
+      statusSelect.appendChild(o);
+    });
+    statusSelect.onchange=()=>{a.status=statusSelect.value;save('artists-note');};
+    const estInput = el('input',{type:'number',value:a.estimate}); estInput.oninput=()=>{a.estimate=estInput.value;save('artists-note');renderArtistTotals();};
+    const quotedInput = el('input',{type:'number',value:a.quoted}); quotedInput.oninput=()=>{a.quoted=quotedInput.value;save('artists-note');renderArtistTotals();};
+    const actualInput = el('input',{type:'number',value:a.actual}); actualInput.oninput=()=>{a.actual=actualInput.value;save('artists-note');renderArtistTotals();};
+    const notesInput = el('input',{value:a.notes||''}); notesInput.oninput=()=>{a.notes=notesInput.value;save('artists-note');};
+    tr.appendChild(el('td',{},nameInput));
+    tr.appendChild(el('td',{},dayInput));
+    tr.appendChild(el('td',{},statusSelect));
+    tr.appendChild(el('td',{class:'right'},estInput));
+    tr.appendChild(el('td',{class:'right'},quotedInput));
+    tr.appendChild(el('td',{class:'right'},actualInput));
+    tr.appendChild(el('td',{},notesInput));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.artists = data.artists.filter(x=>x.id!==a.id); save('artists-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add act'});
+  addBtn.onclick=()=>{ data.artists.push({id:cid(),name:'',day:'',status:'Enquiry',estimate:0,quoted:0,actual:0,notes:''}); save('artists-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'artists-note'}));
+
+  const grid = el('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:18px;'});
+  [
+    ['Total Estimate', fmt(artistTotalStage('estimate')), 'kpi-art-est'],
+    ['Total Quoted/Offered', fmt(artistTotalStage('quoted')), 'kpi-art-quo'],
+    ['Total Confirmed (Actual)', fmt(artistTotalStage('actual')), 'kpi-art-act'],
+  ].forEach(([label,val,idv])=>{
+    const c = el('div',{class:'card'});
+    c.appendChild(el('div',{class:'kpiLabel',text:label}));
+    c.appendChild(el('div',{class:'kpi',id:idv,text:val}));
+    grid.appendChild(c);
+  });
+  main.appendChild(grid);
+  const syncBtn = el('button',{class:'btn secondary',style:'margin-top:12px;',text:'Push totals to Budget → Artist Fees'});
+  syncBtn.onclick = ()=>{
+    pushToBudget('Artist Fees', {estimate:artistTotalStage('estimate'), quoted:artistTotalStage('quoted'), actual:artistTotalStage('actual')});
+    save('artists-note');
+  };
+  main.appendChild(syncBtn);
+}
+function renderArtistTotals(){
+  const e1=document.getElementById('kpi-art-est'); if(e1) e1.textContent=fmt(artistTotalStage('estimate'));
+  const e2=document.getElementById('kpi-art-quo'); if(e2) e2.textContent=fmt(artistTotalStage('quoted'));
+  const e3=document.getElementById('kpi-art-act'); if(e3) e3.textContent=fmt(artistTotalStage('actual'));
+}
+
+/* ================= TICKETING ================= */
+function pageTicketing(main){
+  main.appendChild(el('h1',{text:'Ticketing'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Set a capacity cap per day, then allocate ticket tiers against that cap. Tick every day a tier grants entry to — a Weekend pass ticking Day 1 + Day 2 counts against both.'}));
+
+  main.appendChild(el('h2',{text:'Day capacity'}));
+  const dayTable = el('table');
+  dayTable.appendChild(el('tr',{html:'<th>Day</th><th class="right">Capacity</th><th class="right">Allocated</th><th></th><th></th>'}));
+  data.ticketDays.forEach(d=>{
+    const tr = document.createElement('tr');
+    const nameInput = el('input',{value:d.name}); nameInput.oninput=()=>{d.name=nameInput.value;save('tix-note');renderPage();};
+    const capInput = el('input',{type:'number',value:d.capacity}); capInput.oninput=()=>{d.capacity=capInput.value;save('tix-note');renderTicketTotals();};
+    const allocated = dayAllocated(d.id);
+    const over = allocated > (Number(d.capacity)||0);
+    const allocTd = el('td',{class:'right mono '+(over?'neg':''),id:'dayalloc-'+d.id,text:allocated.toLocaleString()});
+    const statusTd = el('td',{});
+    const pill = el('span',{class:'status-pill '+(over?'status-red':'status-green'),text: over ? 'Over cap':'OK'});
+    pill.id = 'daystatus-'+d.id;
+    statusTd.appendChild(pill);
+    tr.appendChild(el('td',{},nameInput));
+    tr.appendChild(el('td',{class:'right'},capInput));
+    tr.appendChild(allocTd);
+    tr.appendChild(statusTd);
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{
+      data.ticketDays = data.ticketDays.filter(x=>x.id!==d.id);
+      data.ticketTiers.forEach(t=>{ t.dayIds = (t.dayIds||[]).filter(id=>id!==d.id); });
+      save('tix-note'); renderPage();
+    };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    dayTable.appendChild(tr);
+  });
+  main.appendChild(dayTable);
+  const addDayBtn = el('button',{class:'btn secondary addRow',text:'+ Add day'});
+  addDayBtn.onclick=()=>{ data.ticketDays.push({id:cid(),name:'New day',capacity:0}); save('tix-note'); renderPage(); };
+  main.appendChild(addDayBtn);
+
+  main.appendChild(el('h2',{text:'Ticket tiers'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Tier</th><th>Access days</th><th class="right">Price</th><th class="right">Allocation (cap)</th><th class="right">Sold</th><th class="right">Revenue</th><th class="right">Potential</th><th></th>'}));
+  data.ticketTiers.forEach(t=>{
+    const tr = document.createElement('tr');
+    const nameInput = el('input',{value:t.name}); nameInput.oninput=()=>{t.name=nameInput.value;save('tix-note');};
+    const dayWrap = el('div',{style:'display:flex;flex-wrap:wrap;gap:8px;'});
+    data.ticketDays.forEach(d=>{
+      const label = el('label',{style:'display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer;'});
+      const cb = document.createElement('input');
+      cb.type='checkbox'; cb.style.width='auto';
+      cb.checked = (t.dayIds||[]).includes(d.id);
+      cb.onchange = ()=>{
+        t.dayIds = t.dayIds || [];
+        if(cb.checked){ if(!t.dayIds.includes(d.id)) t.dayIds.push(d.id); }
+        else { t.dayIds = t.dayIds.filter(id=>id!==d.id); }
+        save('tix-note'); renderTicketTotals();
+      };
+      label.appendChild(cb); label.appendChild(document.createTextNode(d.name));
+      dayWrap.appendChild(label);
+    });
+    const priceInput = el('input',{type:'number',value:t.price}); priceInput.oninput=()=>{t.price=priceInput.value;save('tix-note');renderTicketTotals();};
+    const allocInput = el('input',{type:'number',value:t.allocation}); allocInput.oninput=()=>{t.allocation=allocInput.value;save('tix-note');renderTicketTotals();};
+    const soldInput = el('input',{type:'number',value:t.sold}); soldInput.oninput=()=>{t.sold=soldInput.value;save('tix-note');renderTicketTotals();};
+    const revTd = el('td',{class:'right mono',id:'rev-'+t.id,text:fmt((Number(t.price)||0)*(Number(t.sold)||0))});
+    const potTd = el('td',{class:'right mono muted',id:'pot-'+t.id,text:fmt((Number(t.price)||0)*(Number(t.allocation)||0))});
+    tr.appendChild(el('td',{},nameInput));
+    tr.appendChild(el('td',{},dayWrap));
+    tr.appendChild(el('td',{class:'right'},priceInput));
+    tr.appendChild(el('td',{class:'right'},allocInput));
+    tr.appendChild(el('td',{class:'right'},soldInput));
+    tr.appendChild(revTd);
+    tr.appendChild(potTd);
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.ticketTiers = data.ticketTiers.filter(x=>x.id!==t.id); save('tix-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add tier'});
+  addBtn.onclick=()=>{
+    const firstDay = data.ticketDays[0];
+    data.ticketTiers.push({id:cid(),name:'General Admission',dayIds: firstDay?[firstDay.id]:[],price:0,allocation:0,sold:0});
+    save('tix-note'); renderPage();
+  };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'tix-note'}));
+
+  main.appendChild(el('h2',{text:'Sell-through projection'}));
+  const projCard = el('div',{class:'card',style:'max-width:340px;'});
+  const pctInput = el('input',{type:'number',value:data.projectedSellThrough,min:'0',max:'100'});
+  pctInput.oninput = ()=>{ data.projectedSellThrough = pctInput.value; save('tix-note'); renderTicketTotals(); };
+  projCard.appendChild(labeled('Projected sell-through %', pctInput));
+  projCard.appendChild(el('div',{class:'kpiLabel',style:'margin-top:8px;',text:'Projected revenue at this rate'}));
+  projCard.appendChild(el('div',{class:'kpi',id:'kpi-projrev',text:fmt(ticketProjectedRevenue(data.projectedSellThrough))}));
+  main.appendChild(projCard);
+
+  main.appendChild(el('h2',{text:'Sales summary'}));
+  const grid = el('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:14px;'});
+  const sold = data.ticketTiers.reduce((s,t)=>s+(Number(t.sold)||0),0);
+  [
+    ['Total Capacity', totalDayCapacity().toLocaleString(), 'kpi-cap'],
+    ['Total Allocated', totalAllocated().toLocaleString(), 'kpi-alloc'],
+    ['Total Sold', sold.toLocaleString(), 'kpi-sold'],
+    ['Ticket Revenue', fmt(ticketRevenue()), 'kpi-tixrev'],
+    ['Total Potential Revenue', fmt(ticketPotentialRevenue()), 'kpi-potrev'],
+  ].forEach(([label,val,idv])=>{
+    const c = el('div',{class:'card'});
+    c.appendChild(el('div',{class:'kpiLabel',text:label}));
+    c.appendChild(el('div',{class:'kpi',id:idv,text:val}));
+    grid.appendChild(c);
+  });
+  main.appendChild(grid);
+}
+function renderTicketTotals(){
+  data.ticketTiers.forEach(t=>{
+    const r = document.getElementById('rev-'+t.id); if(r) r.textContent = fmt((Number(t.price)||0)*(Number(t.sold)||0));
+    const p = document.getElementById('pot-'+t.id); if(p) p.textContent = fmt((Number(t.price)||0)*(Number(t.allocation)||0));
+  });
+  data.ticketDays.forEach(d=>{
+    const allocated = dayAllocated(d.id);
+    const over = allocated > (Number(d.capacity)||0);
+    const a = document.getElementById('dayalloc-'+d.id);
+    if(a){ a.textContent = allocated.toLocaleString(); a.className = 'right mono '+(over?'neg':''); }
+    const s = document.getElementById('daystatus-'+d.id);
+    if(s){ s.textContent = over?'Over cap':'OK'; s.className = 'status-pill '+(over?'status-red':'status-green'); }
+  });
+  const sold = data.ticketTiers.reduce((s,t)=>s+(Number(t.sold)||0),0);
+  const c1=document.getElementById('kpi-cap'); if(c1) c1.textContent=totalDayCapacity().toLocaleString();
+  const c1b=document.getElementById('kpi-alloc'); if(c1b) c1b.textContent=totalAllocated().toLocaleString();
+  const c2=document.getElementById('kpi-sold'); if(c2) c2.textContent=sold.toLocaleString();
+  const c3=document.getElementById('kpi-tixrev'); if(c3) c3.textContent=fmt(ticketRevenue());
+  const c4=document.getElementById('kpi-potrev'); if(c4) c4.textContent=fmt(ticketPotentialRevenue());
+  const c5=document.getElementById('kpi-projrev'); if(c5) c5.textContent=fmt(ticketProjectedRevenue(data.projectedSellThrough));
+}
+
+/* ================= OTHER INCOME & BREAKEVEN ================= */
+function pageIncome(main){
+  main.appendChild(el('h1',{text:'Other Income & Breakeven'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Traders and sponsorship, with Estimate/Quoted/Actual, plus where ticket sales need to land to break even.'}));
+
+  main.appendChild(el('h2',{text:'Traders & sponsorship'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Source</th><th>Type</th><th>Digital/Physical</th><th class="right">Estimate</th><th class="right">Quoted</th><th class="right">Actual</th><th>Notes</th><th></th>'}));
+  data.otherIncome.forEach(o=>{
+    const tr = document.createElement('tr');
+    const sourceInput = el('input',{value:o.source||''}); sourceInput.oninput=()=>{o.source=sourceInput.value;save('income-note');};
+    const typeSelect = el('select');
+    ['Trader','Sponsorship','Other'].forEach(opt=>{ const op=el('option',{value:opt,text:opt}); if(o.type===opt) op.selected=true; typeSelect.appendChild(op); });
+    typeSelect.onchange=()=>{o.type=typeSelect.value;save('income-note');};
+    const kindSelect = el('select');
+    ['Physical','Digital'].forEach(opt=>{ const op=el('option',{value:opt,text:opt}); if(o.kind===opt) op.selected=true; kindSelect.appendChild(op); });
+    kindSelect.onchange=()=>{o.kind=kindSelect.value;save('income-note');};
+    const estInput = el('input',{type:'number',value:o.estimate}); estInput.oninput=()=>{o.estimate=estInput.value;save('income-note');renderIncomeTotals();};
+    const quotedInput = el('input',{type:'number',value:o.quoted}); quotedInput.oninput=()=>{o.quoted=quotedInput.value;save('income-note');renderIncomeTotals();};
+    const actualInput = el('input',{type:'number',value:o.actual}); actualInput.oninput=()=>{o.actual=actualInput.value;save('income-note');renderIncomeTotals();};
+    const notesInput = el('input',{value:o.notes||''}); notesInput.oninput=()=>{o.notes=notesInput.value;save('income-note');};
+    tr.appendChild(el('td',{},sourceInput));
+    tr.appendChild(el('td',{},typeSelect));
+    tr.appendChild(el('td',{},kindSelect));
+    tr.appendChild(el('td',{class:'right'},estInput));
+    tr.appendChild(el('td',{class:'right'},quotedInput));
+    tr.appendChild(el('td',{class:'right'},actualInput));
+    tr.appendChild(el('td',{},notesInput));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.otherIncome = data.otherIncome.filter(x=>x.id!==o.id); save('income-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add income source'});
+  addBtn.onclick=()=>{ data.otherIncome.push({id:cid(),source:'',type:'Trader',kind:'Physical',estimate:0,quoted:0,actual:0,notes:''}); save('income-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'income-note'}));
+
+  main.appendChild(el('h2',{text:'Breakeven'}));
+  const grid = el('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;'});
+  [
+    ['Total Costs (Actual)', fmt(costsStage('actual')), 'kpi-inc-costs'],
+    ['Merch + Traders + Sponsorship (Actual)', fmt(merchRevenue()+otherIncomeStage('actual')), 'kpi-inc-nonticket'],
+    ['Costs Left to Cover by Tickets', fmt(costsToCover()), 'kpi-inc-tocover'],
+    ['Average Ticket Price', fmt(avgTicketPrice()), 'kpi-inc-avgprice'],
+    ['Breakeven Tickets Needed', breakevenTickets().toLocaleString(), 'kpi-inc-breakeven'],
+    ['Total Ticket Capacity', totalDayCapacity().toLocaleString(), 'kpi-inc-cap'],
+  ].forEach(([label,val,idv])=>{
+    const c = el('div',{class:'card'});
+    c.appendChild(el('div',{class:'kpiLabel',text:label}));
+    c.appendChild(el('div',{class:'kpi',id:idv,text:val}));
+    grid.appendChild(c);
+  });
+  main.appendChild(grid);
+}
+function renderIncomeTotals(){
+  const map = {
+    'kpi-inc-costs': fmt(costsStage('actual')),
+    'kpi-inc-nonticket': fmt(merchRevenue()+otherIncomeStage('actual')),
+    'kpi-inc-tocover': fmt(costsToCover()),
+    'kpi-inc-avgprice': fmt(avgTicketPrice()),
+    'kpi-inc-breakeven': breakevenTickets().toLocaleString(),
+  };
+  Object.entries(map).forEach(([id,val])=>{ const e=document.getElementById(id); if(e) e.textContent=val; });
+}
+
+/* ================= CATERING & CREW MEALS ================= */
+function pageCatering(main){
+  main.appendChild(el('h1',{text:'Catering & Crew Meals'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Headcount on site per day, driven by the schedule. Set Estimate/Quoted/Actual cost per meal, then per-day cost is calculated automatically.'}));
+
+  main.appendChild(el('h2',{text:'Meal cost per head'}));
+  const costTable = el('table',{style:'max-width:620px;'});
+  costTable.appendChild(el('tr',{html:'<th>Meal</th><th class="right">Estimate</th><th class="right">Quoted</th><th class="right">Actual</th>'}));
+  ['breakfast','lunch','dinner'].forEach(meal=>{
+    const tr = document.createElement('tr');
+    tr.appendChild(el('td',{text:meal.charAt(0).toUpperCase()+meal.slice(1)}));
+    ['estimate','quoted','actual'].forEach(stage=>{
+      const input = el('input',{type:'number',value:data.cateringSettings[meal][stage]});
+      input.oninput = ()=>{ data.cateringSettings[meal][stage]=input.value; save('catering-note'); renderCateringTotals(); };
+      tr.appendChild(el('td',{class:'right'},input));
+    });
+    costTable.appendChild(tr);
+  });
+  main.appendChild(costTable);
+
+  main.appendChild(el('h2',{text:'Days on site'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Day</th><th class="right">Headcount</th><th>Breakfast</th><th>Lunch</th><th>Dinner</th><th class="right">Est cost</th><th class="right">Quoted cost</th><th class="right">Actual cost</th><th>Notes</th><th></th>'}));
+  data.cateringDays.forEach(row=>{
+    const tr = document.createElement('tr');
+    const dayInput = el('input',{value:row.day||''}); dayInput.oninput=()=>{row.day=dayInput.value;save('catering-note');};
+    const headInput = el('input',{type:'number',value:row.headcount}); headInput.oninput=()=>{row.headcount=headInput.value;save('catering-note');renderCateringTotals();};
+    const mkCheck = (key)=>{ const cb=document.createElement('input'); cb.type='checkbox'; cb.style.width='auto'; cb.checked=!!row[key];
+      cb.onchange=()=>{row[key]=cb.checked;save('catering-note');renderCateringTotals();}; return cb; };
+    const bCheck = mkCheck('breakfast'), lCheck = mkCheck('lunch'), dCheck = mkCheck('dinner');
+    const notesInput = el('input',{value:row.notes||''}); notesInput.oninput=()=>{row.notes=notesInput.value;save('catering-note');};
+    const estTd = el('td',{class:'right mono',id:'catest-'+row.id,text:fmt(cateringRowCost(row,'estimate'))});
+    const quoTd = el('td',{class:'right mono',id:'catquo-'+row.id,text:fmt(cateringRowCost(row,'quoted'))});
+    const actTd = el('td',{class:'right mono',id:'catact-'+row.id,text:fmt(cateringRowCost(row,'actual'))});
+    tr.appendChild(el('td',{},dayInput));
+    tr.appendChild(el('td',{class:'right'},headInput));
+    tr.appendChild(el('td',{style:'text-align:center;'},bCheck));
+    tr.appendChild(el('td',{style:'text-align:center;'},lCheck));
+    tr.appendChild(el('td',{style:'text-align:center;'},dCheck));
+    tr.appendChild(estTd); tr.appendChild(quoTd); tr.appendChild(actTd);
+    tr.appendChild(el('td',{},notesInput));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.cateringDays = data.cateringDays.filter(x=>x.id!==row.id); save('catering-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add day'});
+  addBtn.onclick=()=>{ data.cateringDays.push({id:cid(),day:'',headcount:0,breakfast:false,lunch:true,dinner:true,notes:''}); save('catering-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'catering-note'}));
+
+  const grid = el('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:18px;'});
+  [
+    ['Total Estimate', fmt(totalCateringStage('estimate')), 'kpi-cat-est'],
+    ['Total Quoted', fmt(totalCateringStage('quoted')), 'kpi-cat-quo'],
+    ['Total Actual', fmt(totalCateringStage('actual')), 'kpi-cat-act'],
+  ].forEach(([label,val,idv])=>{
+    const c = el('div',{class:'card'});
+    c.appendChild(el('div',{class:'kpiLabel',text:label}));
+    c.appendChild(el('div',{class:'kpi',id:idv,text:val}));
+    grid.appendChild(c);
+  });
+  main.appendChild(grid);
+  const syncBtn = el('button',{class:'btn secondary',style:'margin-top:12px;',text:'Push totals to Budget → Catering'});
+  syncBtn.onclick = ()=>{
+    pushToBudget('Catering', {estimate:totalCateringStage('estimate'), quoted:totalCateringStage('quoted'), actual:totalCateringStage('actual')});
+    save('catering-note');
+  };
+  main.appendChild(syncBtn);
+  main.appendChild(el('div',{class:'muted',style:'margin-top:10px;font-size:12px;',text:'Feed people properly — good catering means crew work harder for lower day rates.'}));
+}
+function renderCateringTotals(){
+  data.cateringDays.forEach(row=>{
+    const e1=document.getElementById('catest-'+row.id); if(e1) e1.textContent=fmt(cateringRowCost(row,'estimate'));
+    const e2=document.getElementById('catquo-'+row.id); if(e2) e2.textContent=fmt(cateringRowCost(row,'quoted'));
+    const e3=document.getElementById('catact-'+row.id); if(e3) e3.textContent=fmt(cateringRowCost(row,'actual'));
+  });
+  const k1=document.getElementById('kpi-cat-est'); if(k1) k1.textContent=fmt(totalCateringStage('estimate'));
+  const k2=document.getElementById('kpi-cat-quo'); if(k2) k2.textContent=fmt(totalCateringStage('quoted'));
+  const k3=document.getElementById('kpi-cat-act'); if(k3) k3.textContent=fmt(totalCateringStage('actual'));
+}
+
+/* ================= CREW & STAFFING ================= */
+function pageStaffing(main){
+  main.appendChild(el('h1',{text:'Crew & Staffing'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Roles, headcount, days worked, and Estimate/Quoted/Actual day rate. Rate £0 means unpaid/expenses-only.'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Role</th><th>Day(s)</th><th class="right">Headcount</th><th class="right"># Days</th><th class="right">Est rate</th><th class="right">Quoted rate</th><th class="right">Actual rate</th><th class="right">Est cost</th><th class="right">Actual cost</th><th>Notes</th><th></th>'}));
+  data.staffing.forEach(s=>{
+    const tr = document.createElement('tr');
+    const roleInput = el('input',{value:s.role}); roleInput.oninput=()=>{s.role=roleInput.value;save('staff-note');};
+    const dayInput = el('input',{value:s.days||''}); dayInput.oninput=()=>{s.days=dayInput.value;save('staff-note');};
+    const headInput = el('input',{type:'number',value:s.headcount}); headInput.oninput=()=>{s.headcount=headInput.value;save('staff-note');renderStaffTotals();};
+    const numDaysInput = el('input',{type:'number',value:s.numDays||0}); numDaysInput.oninput=()=>{s.numDays=numDaysInput.value;save('staff-note');renderStaffTotals();};
+    const rateEInput = el('input',{type:'number',value:s.rateEstimate}); rateEInput.oninput=()=>{s.rateEstimate=rateEInput.value;save('staff-note');renderStaffTotals();};
+    const rateQInput = el('input',{type:'number',value:s.rateQuoted}); rateQInput.oninput=()=>{s.rateQuoted=rateQInput.value;save('staff-note');renderStaffTotals();};
+    const rateAInput = el('input',{type:'number',value:s.rateActual}); rateAInput.oninput=()=>{s.rateActual=rateAInput.value;save('staff-note');renderStaffTotals();};
+    const notesInput = el('input',{value:s.notes||''}); notesInput.oninput=()=>{s.notes=notesInput.value;save('staff-note');};
+    const estCostTd = el('td',{class:'right mono',id:'crewest-'+s.id,text:fmt(crewCost(s,'estimate'))});
+    const actCostTd = el('td',{class:'right mono',id:'crewact-'+s.id,text:fmt(crewCost(s,'actual'))});
+    tr.appendChild(el('td',{},roleInput));
+    tr.appendChild(el('td',{},dayInput));
+    tr.appendChild(el('td',{class:'right'},headInput));
+    tr.appendChild(el('td',{class:'right'},numDaysInput));
+    tr.appendChild(el('td',{class:'right'},rateEInput));
+    tr.appendChild(el('td',{class:'right'},rateQInput));
+    tr.appendChild(el('td',{class:'right'},rateAInput));
+    tr.appendChild(estCostTd); tr.appendChild(actCostTd);
+    tr.appendChild(el('td',{},notesInput));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.staffing = data.staffing.filter(x=>x.id!==s.id); save('staff-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add role'});
+  addBtn.onclick=()=>{ data.staffing.push({id:cid(),role:'Steward',days:'All days',numDays:0,headcount:0,rateEstimate:0,rateQuoted:0,rateActual:0,notes:''}); save('staff-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'staff-note'}));
+
+  const grid = el('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:18px;'});
+  [
+    ['Total Estimate', fmt(totalCrewStage('estimate')), 'kpi-crew-est'],
+    ['Total Quoted', fmt(totalCrewStage('quoted')), 'kpi-crew-quo'],
+    ['Total Actual', fmt(totalCrewStage('actual')), 'kpi-crew-act'],
+  ].forEach(([label,val,idv])=>{
+    const c = el('div',{class:'card'});
+    c.appendChild(el('div',{class:'kpiLabel',text:label}));
+    c.appendChild(el('div',{class:'kpi',id:idv,text:val}));
+    grid.appendChild(c);
+  });
+  main.appendChild(grid);
+  const syncBtn = el('button',{class:'btn secondary',style:'margin-top:12px;',text:'Push totals to Budget → Crew'});
+  syncBtn.onclick = ()=>{
+    pushToBudget('Crew', {estimate:totalCrewStage('estimate'), quoted:totalCrewStage('quoted'), actual:totalCrewStage('actual')});
+    save('staff-note');
+  };
+  main.appendChild(syncBtn);
+}
+function renderStaffTotals(){
+  data.staffing.forEach(s=>{
+    const e1=document.getElementById('crewest-'+s.id); if(e1) e1.textContent=fmt(crewCost(s,'estimate'));
+    const e2=document.getElementById('crewact-'+s.id); if(e2) e2.textContent=fmt(crewCost(s,'actual'));
+  });
+  const k1=document.getElementById('kpi-crew-est'); if(k1) k1.textContent=fmt(totalCrewStage('estimate'));
+  const k2=document.getElementById('kpi-crew-quo'); if(k2) k2.textContent=fmt(totalCrewStage('quoted'));
+  const k3=document.getElementById('kpi-crew-act'); if(k3) k3.textContent=fmt(totalCrewStage('actual'));
+}
+
+/* ================= MERCH ================= */
+function pageMerch(main){
+  main.appendChild(el('h1',{text:'Merch'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Merchandise lines, cost, price and units sold.'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Item</th><th class="right">Cost</th><th class="right">Price</th><th class="right">Stock</th><th class="right">Sold</th><th class="right">Revenue</th><th></th>'}));
+  data.merch.forEach(m=>{
+    const tr = document.createElement('tr');
+    const nameInput = el('input',{value:m.name}); nameInput.oninput=()=>{m.name=nameInput.value;save('merch-note');};
+    const costInput = el('input',{type:'number',value:m.cost}); costInput.oninput=()=>{m.cost=costInput.value;save('merch-note');};
+    const priceInput = el('input',{type:'number',value:m.price}); priceInput.oninput=()=>{m.price=priceInput.value;save('merch-note');renderMerchTotals();};
+    const stockInput = el('input',{type:'number',value:m.stock}); stockInput.oninput=()=>{m.stock=stockInput.value;save('merch-note');};
+    const soldInput = el('input',{type:'number',value:m.sold}); soldInput.oninput=()=>{m.sold=soldInput.value;save('merch-note');renderMerchTotals();};
+    const revTd = el('td',{class:'right mono',id:'mrev-'+m.id,text:fmt((Number(m.price)||0)*(Number(m.sold)||0))});
+    tr.appendChild(el('td',{},nameInput));
+    tr.appendChild(el('td',{class:'right'},costInput));
+    tr.appendChild(el('td',{class:'right'},priceInput));
+    tr.appendChild(el('td',{class:'right'},stockInput));
+    tr.appendChild(el('td',{class:'right'},soldInput));
+    tr.appendChild(revTd);
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.merch = data.merch.filter(x=>x.id!==m.id); save('merch-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add item'});
+  addBtn.onclick=()=>{ data.merch.push({id:cid(),name:'T-shirt',cost:0,price:0,stock:0,sold:0}); save('merch-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'merch-note'}));
+  const c = el('div',{class:'card',style:'margin-top:18px;max-width:260px;'});
+  c.appendChild(el('div',{class:'kpiLabel',text:'Merch Revenue'}));
+  c.appendChild(el('div',{class:'kpi',id:'kpi-merchrev',text:fmt(merchRevenue())}));
+  main.appendChild(c);
+}
+function renderMerchTotals(){
+  data.merch.forEach(m=>{ const r=document.getElementById('mrev-'+m.id); if(r) r.textContent=fmt((Number(m.price)||0)*(Number(m.sold)||0)); });
+  const k = document.getElementById('kpi-merchrev'); if(k) k.textContent = fmt(merchRevenue());
+}
+
+/* ================= CONTACTS ================= */
+function pageContacts(main){
+  main.appendChild(el('h1',{text:'Contacts'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Key contacts across production, authorities and suppliers.'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Name</th><th>Organisation</th><th>Role</th><th>Phone</th><th>Email</th><th></th>'}));
+  data.contacts.forEach(c=>{
+    const tr = document.createElement('tr');
+    ['name','org','role','phone','email'].forEach(f=>{
+      const input = el('input',{value:c[f]||''});
+      input.oninput = ()=>{ c[f]=input.value; save('contacts-note'); };
+      tr.appendChild(el('td',{},input));
+    });
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.contacts = data.contacts.filter(x=>x.id!==c.id); save('contacts-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add contact'});
+  addBtn.onclick=()=>{ data.contacts.push({id:cid(),name:'',org:'',role:'',phone:'',email:''}); save('contacts-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'contacts-note'}));
+}
+
+/* ================= SCHEDULE ================= */
+function pageSchedule(main){
+  main.appendChild(el('h1',{text:'Schedule'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Running order across days — stage times, set changes, curfews.'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Day</th><th>Time</th><th>Item</th><th>Stage/Area</th><th></th>'}));
+  data.schedule.forEach(s=>{
+    const tr = document.createElement('tr');
+    const dayInput = el('input',{value:s.day||''}); dayInput.oninput=()=>{s.day=dayInput.value;save('sched-note');};
+    const timeInput = el('input',{value:s.time||''}); timeInput.oninput=()=>{s.time=timeInput.value;save('sched-note');};
+    const itemInput = el('input',{value:s.item||''}); itemInput.oninput=()=>{s.item=itemInput.value;save('sched-note');};
+    const areaInput = el('input',{value:s.area||''}); areaInput.oninput=()=>{s.area=areaInput.value;save('sched-note');};
+    tr.appendChild(el('td',{},dayInput));
+    tr.appendChild(el('td',{},timeInput));
+    tr.appendChild(el('td',{},itemInput));
+    tr.appendChild(el('td',{},areaInput));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.schedule = data.schedule.filter(x=>x.id!==s.id); save('sched-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add item'});
+  addBtn.onclick=()=>{ data.schedule.push({id:cid(),day:'Day 1',time:'',item:'',area:'Main Stage'}); save('sched-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'sched-note'}));
+}
+
+/* ================= PRODUCTION ADVANCING ================= */
+function pageAdvancing(main){
+  main.appendChild(el('h1',{text:'Production Advancing'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Per-act or per-supplier advance details — rider, tech, arrival, status.'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Act/Supplier</th><th>Day</th><th>Arrival</th><th>Rider/Tech notes</th><th>Status</th><th></th>'}));
+  data.advancing.forEach(a=>{
+    const tr = document.createElement('tr');
+    const nameInput = el('input',{value:a.name||''}); nameInput.oninput=()=>{a.name=nameInput.value;save('adv-note');};
+    const dayInput = el('input',{value:a.day||''}); dayInput.oninput=()=>{a.day=dayInput.value;save('adv-note');};
+    const arrivalInput = el('input',{value:a.arrival||''}); arrivalInput.oninput=()=>{a.arrival=arrivalInput.value;save('adv-note');};
+    const notesInput = el('input',{value:a.notes||''}); notesInput.oninput=()=>{a.notes=notesInput.value;save('adv-note');};
+    const statusSelect = el('select');
+    ['Not started','Sent','Confirmed','Complete'].forEach(opt=>{ const o=el('option',{value:opt,text:opt}); if(a.status===opt) o.selected=true; statusSelect.appendChild(o); });
+    statusSelect.onchange = ()=>{ a.status = statusSelect.value; save('adv-note'); };
+    tr.appendChild(el('td',{},nameInput));
+    tr.appendChild(el('td',{},dayInput));
+    tr.appendChild(el('td',{},arrivalInput));
+    tr.appendChild(el('td',{},notesInput));
+    tr.appendChild(el('td',{},statusSelect));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.advancing = data.advancing.filter(x=>x.id!==a.id); save('adv-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add act/supplier'});
+  addBtn.onclick=()=>{ data.advancing.push({id:cid(),name:'',day:'Day 1',arrival:'',notes:'',status:'Not started'}); save('adv-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'adv-note'}));
+}
+
+/* ================= SITE MAP ================= */
+function pageSitemap(main){
+  main.appendChild(el('h1',{text:'Site Map'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Notes on layout, zones and access. Upload the actual map graphic separately — this is your key/notes reference.'}));
+  const ta = el('textarea',{style:'min-height:340px;',placeholder:'e.g. Main Stage — pitch (north end)\nBar 1 — west stand concourse\nMedical point — southeast corner, adjacent to Gate 3\nArtist compound — car park B, fenced, wristband access only\nEmergency vehicle route — perimeter road, keep clear at all times'});
+  ta.value = data.sitemapNotes || '';
+  ta.oninput = ()=>{ data.sitemapNotes = ta.value; save('sitemap-note'); };
+  main.appendChild(ta);
+  main.appendChild(el('div',{class:'saveNote',id:'sitemap-note'}));
+}
+
+/* ================= EVENT CONTROL ================= */
+function pageEventControl(main){
+  main.appendChild(el('h1',{text:'Event Control'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Live incident/decision log during the event.'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Time</th><th>Log entry</th><th>Logged by</th><th>Status</th><th></th>'}));
+  data.eventControlLog.forEach(l=>{
+    const tr = document.createElement('tr');
+    const timeInput = el('input',{value:l.time||''}); timeInput.oninput=()=>{l.time=timeInput.value;save('ec-note');};
+    const entryInput = el('input',{value:l.entry||''}); entryInput.oninput=()=>{l.entry=entryInput.value;save('ec-note');};
+    const byInput = el('input',{value:l.by||''}); byInput.oninput=()=>{l.by=byInput.value;save('ec-note');};
+    const statusSelect = el('select');
+    ['Open','Monitoring','Resolved'].forEach(opt=>{ const o=el('option',{value:opt,text:opt}); if(l.status===opt) o.selected=true; statusSelect.appendChild(o); });
+    statusSelect.onchange = ()=>{ l.status = statusSelect.value; save('ec-note'); };
+    tr.appendChild(el('td',{},timeInput));
+    tr.appendChild(el('td',{},entryInput));
+    tr.appendChild(el('td',{},byInput));
+    tr.appendChild(el('td',{},statusSelect));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.eventControlLog = data.eventControlLog.filter(x=>x.id!==l.id); save('ec-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add log entry'});
+  addBtn.onclick=()=>{
+    const now = new Date();
+    data.eventControlLog.push({id:cid(),time:now.toTimeString().slice(0,5),entry:'',by:'',status:'Open'});
+    save('ec-note'); renderPage();
+  };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'ec-note'}));
+}
+
+/* ================= HEALTH & SAFETY ================= */
+function pageHealthSafety(main){
+  main.appendChild(el('h1',{text:'Health & Safety'}));
+  main.appendChild(el('div',{class:'pageDesc',text:'Risk items, mitigation, owner and sign-off status.'}));
+  const table = el('table');
+  table.appendChild(el('tr',{html:'<th>Risk</th><th>Mitigation</th><th>Owner</th><th>Risk level</th><th>Signed off</th><th></th>'}));
+  data.healthSafety.forEach(h=>{
+    const tr = document.createElement('tr');
+    const riskInput = el('input',{value:h.risk||''}); riskInput.oninput=()=>{h.risk=riskInput.value;save('hs-note');};
+    const mitInput = el('input',{value:h.mitigation||''}); mitInput.oninput=()=>{h.mitigation=mitInput.value;save('hs-note');};
+    const ownerInput = el('input',{value:h.owner||''}); ownerInput.oninput=()=>{h.owner=ownerInput.value;save('hs-note');};
+    const levelSelect = el('select');
+    ['Low','Medium','High'].forEach(opt=>{ const o=el('option',{value:opt,text:opt}); if(h.level===opt) o.selected=true; levelSelect.appendChild(o); });
+    levelSelect.onchange = ()=>{ h.level = levelSelect.value; save('hs-note'); };
+    const signedInput = document.createElement('input');
+    signedInput.type='checkbox'; signedInput.checked=!!h.signed; signedInput.style.width='auto';
+    signedInput.onchange = ()=>{ h.signed = signedInput.checked; save('hs-note'); };
+    tr.appendChild(el('td',{},riskInput));
+    tr.appendChild(el('td',{},mitInput));
+    tr.appendChild(el('td',{},ownerInput));
+    tr.appendChild(el('td',{},levelSelect));
+    tr.appendChild(el('td',{style:'text-align:center;'},signedInput));
+    const delBtn = el('button',{class:'icon',text:'✕'});
+    delBtn.onclick=()=>{ data.healthSafety = data.healthSafety.filter(x=>x.id!==h.id); save('hs-note'); renderPage(); };
+    tr.appendChild(el('td',{class:'row-actions'},delBtn));
+    table.appendChild(tr);
+  });
+  main.appendChild(table);
+  const addBtn = el('button',{class:'btn secondary addRow',text:'+ Add risk item'});
+  addBtn.onclick=()=>{ data.healthSafety.push({id:cid(),risk:'',mitigation:'',owner:'',level:'Medium',signed:false}); save('hs-note'); renderPage(); };
+  main.appendChild(addBtn);
+  main.appendChild(el('div',{class:'saveNote',id:'hs-note'}));
+}
+
+/* ================= IMPORT / EXPORT / REFRESH ================= */
+document.getElementById('refreshBtn').onclick = ()=>{ loadData(); };
+document.getElementById('exportBtn').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `festival-plan-${stamp}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+document.getElementById('importBtn').onclick = ()=>{ document.getElementById('importFile').click(); };
+document.getElementById('importFile').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const imported = JSON.parse(reader.result);
+      data = imported;
+      migrateData();
+      save();
+      render();
+    }catch(err){
+      alert('Could not read that file — make sure it is a festival plan JSON export.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+};
+
+loadData();
+</script>
+</body>
+</html>

@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solotech Swag Store</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --ink: #15171a;
+    --paper: #f6f4ef;
+    --card: #ffffff;
+    --line: #e2ddd3;
+    --accent: #e2542c;
+    --accent-dark: #c4441f;
+    --muted: #7c766c;
+    --good: #2f7d52;
+    --warn: #c47a1f;
+    --bad: #c0392b;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 60px;
+  }
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  header .brand {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-size: 19px;
+  }
+  header .brand span { color: var(--accent); }
+  header button.admin-link {
+    background: transparent;
+    border: 1px solid #3a3d42;
+    color: var(--paper);
+    padding: 7px 14px;
+    border-radius: 9px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  header button.admin-link:hover { border-color: var(--accent); }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 20px; }
+  .wrap.wide { max-width: 920px; }
+  h1 { font-size: 23px; letter-spacing: -0.02em; margin-bottom: 4px; }
+  h2 { font-size: 17px; letter-spacing: -0.01em; margin-bottom: 12px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 22px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input, select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 15px;
+    background: #fff;
+    color: var(--ink);
+    font-family: inherit;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .field { margin-bottom: 14px; }
+  button.primary {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button.primary:hover { background: var(--accent-dark); }
+  button.primary:disabled { background: #c9c4ba; cursor: not-allowed; }
+  .product-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .product-row:last-child { border-bottom: none; }
+  .product-row .info { flex: 1; }
+  .product-row .name { font-weight: 700; font-size: 15px; }
+  .product-row .meta { font-size: 13px; color: var(--muted); }
+  .pill {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+  .pill.in { background: #e4f1ea; color: var(--good); }
+  .pill.low { background: #fbf0dd; color: var(--warn); }
+  .pill.out { background: #f7e2df; color: var(--bad); }
+  .selected { border: 2px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+  .qty-stepper { display: flex; align-items: center; gap: 0; max-width: 160px; }
+  .qty-stepper button {
+    width: 44px; height: 44px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .qty-stepper button:first-child { border-radius: 10px 0 0 10px; }
+  .qty-stepper button:last-child { border-radius: 0 10px 10px 0; }
+  .qty-stepper input { text-align: center; border-radius: 0; border-left: none; border-right: none; max-width: 60px; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 14px 22px; border-radius: 12px;
+    font-weight: 600; font-size: 14px; z-index: 100; max-width: 90%;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+  }
+  .toast.good { background: var(--good); }
+  .toast.bad { background: var(--bad); }
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    background: none; border: none; padding: 11px 14px; font-size: 14px;
+    font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .row-actions button {
+    background: none; border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 10px; font-size: 12px; cursor: pointer; margin-left: 4px;
+  }
+  .row-actions button.del { color: var(--bad); border-color: #f0d4d0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .add-form { background: #faf8f4; border: 1px dashed var(--line); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .size-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .size-chip {
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px;
+    font-size: 13px; cursor: pointer; background: #fff; font-weight: 600;
+  }
+  .size-chip.active { border-color: var(--accent); background: #fdeee9; color: var(--accent-dark); }
+  .size-chip.oos { opacity: 0.4; cursor: not-allowed; }
+  .back-btn { background: none; border: none; color: var(--accent); font-weight: 600; cursor: pointer; font-size: 14px; margin-bottom: 14px; padding: 0; }
+  .setup-note { background: #fbf0dd; border: 1px solid #ecd9b3; border-radius: 10px; padding: 14px; font-size: 13px; margin-bottom: 16px; }
+  .hidden { display: none; }
+  .stat-row { display: flex; gap: 12px; margin-bottom: 16px; }
+  .stat { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .stat .n { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">SOLO<span>SWAG</span> STORE</div>
+  <button class="admin-link" onclick="toggleAdmin()">Admin</button>
+</header>
+
+<!-- PUBLIC: TAKE AN ITEM -->
+<div id="publicView" class="wrap">
+  <h1>Grab your kit</h1>
+  <p class="sub">Pick what you're taking, enter your name, done. Helps us keep stock topped up.</p>
+  <div id="setupNote" class="setup-note hidden"></div>
+
+  <div id="catalogue"></div>
+
+  <!-- selected item flow -->
+  <div id="takeFlow" class="hidden">
+    <button class="back-btn" onclick="clearSelection()">‹ Back to all items</button>
+    <div class="card">
+      <div class="selected">
+        <div class="name" id="selName" style="font-weight:700;font-size:16px;"></div>
+        <div class="meta" id="selMeta" style="font-size:13px;color:var(--muted);"></div>
+      </div>
+      <div class="field">
+        <label>Size</label>
+        <div class="size-chips" id="sizeChips"></div>
+      </div>
+      <div class="field">
+        <label>How many?</label>
+        <div class="qty-stepper">
+          <button onclick="stepQty(-1)">−</button>
+          <input type="number" id="qtyInput" value="1" min="1" readonly>
+          <button onclick="stepQty(1)">+</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Your name</label>
+        <input type="text" id="takerName" placeholder="e.g. Jay Mobbs-Beal" autocomplete="name">
+      </div>
+      <button class="primary" id="confirmBtn" onclick="confirmTake()">Confirm and take</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="adminView" class="wrap wide hidden">
+  <!-- login -->
+  <div id="adminLogin">
+    <h1>Admin</h1>
+    <p class="sub">Enter the admin PIN to manage products and view the log.</p>
+    <div class="card" style="max-width:340px;">
+      <div class="field">
+        <label>PIN</label>
+        <input type="password" id="pinInput" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')checkPin()">
+      </div>
+      <button class="primary" onclick="checkPin()">Unlock</button>
+    </div>
+  </div>
+
+  <!-- panel -->
+  <div id="adminPanel" class="hidden">
+    <h1>Stock admin</h1>
+    <div class="stat-row">
+      <div class="stat"><div class="n" id="statProducts">0</div><div class="l">Products</div></div>
+      <div class="stat"><div class="n" id="statUnits">0</div><div class="l">Units in stock</div></div>
+      <div class="stat"><div class="n" id="statTaken">0</div><div class="l">Items taken</div></div>
+    </div>
+    <div class="tabs">
+      <button class="active" onclick="adminTab('stock')" id="tabStock">Products & stock</button>
+      <button onclick="adminTab('log')" id="tabLog">Activity log</button>
+    </div>
+
+    <!-- stock tab -->
+    <div id="stockTab">
+      <div class="add-form">
+        <h2>Add a product</h2>
+        <div class="field"><label>Product name</label><input type="text" id="npName" placeholder="e.g. Solotech Hoodie"></div>
+        <div class="grid2">
+          <div class="field"><label>Category</label>
+            <select id="npCat">
+              <option>Hoodie</option><option>T-Shirt</option><option>Polo</option>
+              <option>Hi-Vis</option><option>Jacket</option><option>Cap</option><option>Other</option>
+            </select>
+          </div>
+          <div class="field"><label>Sizes (comma separated)</label><input type="text" id="npSizes" placeholder="S, M, L, XL, XXL"></div>
+        </div>
+        <div class="field"><label>Starting qty per size</label><input type="number" id="npQty" value="10" min="0"></div>
+        <button class="primary" onclick="addProduct()">Add product</button>
+      </div>
+      <div id="adminStockList"></div>
+    </div>
+
+    <!-- log tab -->
+    <div id="logTab" class="hidden">
+      <div class="card" style="padding:0;overflow-x:auto;">
+        <table>
+          <thead><tr><th>When</th><th>Name</th><th>Item</th><th>Size</th><th>Qty</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+        <div id="logEmpty" class="empty hidden">No items taken yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   SUPABASE SETUP
+   1. Create a project at supabase.com
+   2. Paste your URL and anon key below
+   3. Run the SQL in the comment block to create the tables
+   ===================================================================== */
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const ADMIN_PIN = '2468'; // change this
+
+/* ---------------------------------------------------------------------
+   SQL to run in Supabase (SQL Editor):
+
+   create table products (
+     id uuid primary key default gen_random_uuid(),
+     name text not null,
+     category text default 'Other',
+     created_at timestamptz default now()
+   );
+
+   create table variants (
+     id uuid primary key default gen_random_uuid(),
+     product_id uuid references products(id) on delete cascade,
+     size text not null,
+     qty int not null default 0
+   );
+
+   create table takes (
+     id uuid primary key default gen_random_uuid(),
+     taker_name text not null,
+     product_name text not null,
+     size text,
+     qty int not null,
+     created_at timestamptz default now()
+   );
+
+   alter table products enable row level security;
+   alter table variants enable row level security;
+   alter table takes enable row level security;
+   create policy "all" on products for all using (true) with check (true);
+   create policy "all" on variants for all using (true) with check (true);
+   create policy "all" on takes for all using (true) with check (true);
+   --------------------------------------------------------------------- */
+
+let sb = null;
+const configured = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+if (configured) sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let products = [];       // [{id,name,category,variants:[{id,size,qty}]}]
+let selected = null;
+let selectedSize = null;
+
+/* ---------- toast ---------- */
+function toast(msg, kind) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (kind || '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+/* ---------- data ---------- */
+async function loadProducts() {
+  if (!configured) { products = demoData(); renderCatalogue(); renderAdminStock(); return; }
+  const { data: prods } = await sb.from('products').select('*').order('created_at');
+  const { data: vars } = await sb.from('variants').select('*');
+  products = (prods || []).map(p => ({
+    ...p,
+    variants: (vars || []).filter(v => v.product_id === p.id).sort((a,b)=>a.size.localeCompare(b.size))
+  }));
+  renderCatalogue();
+  renderAdminStock();
+}
+
+function totalQty(p) { return p.variants.reduce((s,v)=>s+v.qty,0); }
+function stockClass(n) { return n === 0 ? 'out' : n <= 3 ? 'low' : 'in'; }
+function stockLabel(n) { return n === 0 ? 'Out' : n <= 3 ? 'Low' : 'In stock'; }
+
+/* ---------- public catalogue ---------- */
+function renderCatalogue() {
+  const note = document.getElementById('setupNote');
+  if (!configured) {
+    note.classList.remove('hidden');
+    note.innerHTML = '<b>Demo mode.</b> Add your Supabase URL and key in the code to go live. Stock changes here will not save.';
+  }
+  const el = document.getElementById('catalogue');
+  if (!products.length) { el.innerHTML = '<div class="empty">No products yet. Add some in the admin section.</div>'; return; }
+  el.innerHTML = '<div class="card">' + products.map(p => {
+    const n = totalQty(p);
+    return `<div class="product-row" onclick="selectProduct('${p.id}')">
+      <div class="info">
+        <div class="name">${esc(p.name)}</div>
+        <div class="meta">${esc(p.category)} · ${p.variants.length} sizes</div>
+      </div>
+      <span class="pill ${stockClass(n)}">${stockLabel(n)}</span>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function selectProduct(id) {
+  selected = products.find(p => p.id === id);
+  selectedSize = null;
+  document.getElementById('catalogue').classList.add('hidden');
+  document.getElementById('takeFlow').classList.remove('hidden');
+  document.getElementById('selName').textContent = selected.name;
+  document.getElementById('selMeta').textContent = selected.category;
+  document.getElementById('qtyInput').value = 1;
+  document.getElementById('takerName').value = '';
+  const chips = document.getElementById('sizeChips');
+  chips.innerHTML = selected.variants.map(v => {
+    const oos = v.qty === 0;
+    return `<div class="size-chip ${oos?'oos':''}" data-size="${esc(v.size)}" onclick="${oos?'':`pickSize('${esc(v.size)}',this)`}">${esc(v.size)} <span style="color:var(--muted);font-weight:400;">(${v.qty})</span></div>`;
+  }).join('');
+  window.scrollTo(0,0);
+}
+
+function pickSize(size, el) {
+  selectedSize = size;
+  document.querySelectorAll('.size-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('qtyInput').value = 1;
+}
+
+function stepQty(d) {
+  const input = document.getElementById('qtyInput');
+  let v = parseInt(input.value) + d;
+  const max = selectedSize ? (selected.variants.find(x=>x.size===selectedSize)?.qty || 1) : 99;
+  if (v < 1) v = 1;
+  if (v > max) { v = max; toast('Only ' + max + ' left in that size', 'bad'); }
+  input.value = v;
+}
+
+function clearSelection() {
+  selected = null; selectedSize = null;
+  document.getElementById('takeFlow').classList.add('hidden');
+  document.getElementById('catalogue').classList.remove('hidden');
+}
+
+async function confirmTake() {
+  const name = document.getElementById('takerName').value.trim();
+  const qty = parseInt(document.getElementById('qtyInput').value);
+  if (!selectedSize) { toast('Pick a size first', 'bad'); return; }
+  if (!name) { toast('Enter your name', 'bad'); return; }
+  const variant = selected.variants.find(v => v.size === selectedSize);
+  if (qty > variant.qty) { toast('Not enough stock', 'bad'); return; }
+
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  if (configured) {
+    const { error: e1 } = await sb.from('variants').update({ qty: variant.qty - qty }).eq('id', variant.id);
+    const { error: e2 } = await sb.from('takes').insert({
+      taker_name: name, product_name: selected.name, size: selectedSize, qty: qty
+    });
+    if (e1 || e2) { toast('Something went wrong, try again', 'bad'); btn.disabled=false; btn.textContent='Confirm and take'; return; }
+  } else {
+    variant.qty -= qty;
+  }
+
+  toast('Sorted. ' + qty + ' × ' + selected.name + ' (' + selectedSize + ')', 'good');
+  btn.disabled = false; btn.textContent = 'Confirm and take';
+  clearSelection();
+  await loadProducts();
+}
+
+/* ---------- admin ---------- */
+function toggleAdmin() {
+  const a = document.getElementById('adminView'), p = document.getElementById('publicView');
+  if (a.classList.contains('hidden')) { a.classList.remove('hidden'); p.classList.add('hidden'); }
+  else { a.classList.add('hidden'); p.classList.remove('hidden'); }
+}
+
+function checkPin() {
+  if (document.getElementById('pinInput').value === ADMIN_PIN) {
+    document.getElementById('adminLogin').classList.add('hidden');
+    document.getElementById('adminPanel').classList.remove('hidden');
+    renderAdminStock();
+    loadLog();
+  } else { toast('Wrong PIN', 'bad'); }
+}
+
+function adminTab(which) {
+  document.getElementById('stockTab').classList.toggle('hidden', which!=='stock');
+  document.getElementById('logTab').classList.toggle('hidden', which!=='log');
+  document.getElementById('tabStock').classList.toggle('active', which==='stock');
+  document.getElementById('tabLog').classList.toggle('active', which==='log');
+  if (which==='log') loadLog();
+}
+
+function renderAdminStock() {
+  document.getElementById('statProducts').textContent = products.length;
+  document.getElementById('statUnits').textContent = products.reduce((s,p)=>s+totalQty(p),0);
+  const el = document.getElementById('adminStockList');
+  if (!el) return;
+  if (!products.length) { el.innerHTML = '<div class="empty">No products yet.</div>'; return; }
+  el.innerHTML = products.map(p => `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px;">
+        <div><div style="font-weight:700;font-size:16px;">${esc(p.name)}</div>
+        <div style="font-size:13px;color:var(--muted);">${esc(p.category)}</div></div>
+        <div class="row-actions"><button class="del" onclick="delProduct('${p.id}')">Delete</button></div>
+      </div>
+      <table><tbody>
+      ${p.variants.map(v => `<tr>
+        <td style="font-weight:600;">${esc(v.size)}</td>
+        <td><span class="pill ${stockClass(v.qty)}">${v.qty} in stock</span></td>
+        <td style="text-align:right;" class="row-actions">
+          <button onclick="adjustQty('${v.id}',-1)">−</button>
+          <button onclick="adjustQty('${v.id}',1)">+</button>
+          <button onclick="setQty('${v.id}')">Set</button>
+        </td>
+      </tr>`).join('')}
+      </tbody></table>
+    </div>`).join('');
+}
+
+async function addProduct() {
+  const name = document.getElementById('npName').value.trim();
+  const cat = document.getElementById('npCat').value;
+  const sizes = document.getElementById('npSizes').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const qty = parseInt(document.getElementById('npQty').value) || 0;
+  if (!name) { toast('Enter a product name', 'bad'); return; }
+  if (!sizes.length) { toast('Enter at least one size', 'bad'); return; }
+
+  if (configured) {
+    const { data: prod, error } = await sb.from('products').insert({ name, category: cat }).select().single();
+    if (error) { toast('Could not add product', 'bad'); return; }
+    const rows = sizes.map(s => ({ product_id: prod.id, size: s, qty }));
+    await sb.from('variants').insert(rows);
+  } else {
+    products.push({ id: 'demo'+Date.now(), name, category: cat,
+      variants: sizes.map((s,i)=>({ id:'v'+Date.now()+i, size:s, qty })) });
+  }
+  document.getElementById('npName').value = '';
+  document.getElementById('npSizes').value = '';
+  toast('Product added', 'good');
+  await loadProducts();
+}
+
+async function delProduct(id) {
+  if (!confirm('Delete this product and all its stock?')) return;
+  if (configured) await sb.from('products').delete().eq('id', id);
+  else products = products.filter(p=>p.id!==id);
+  toast('Deleted');
+  await loadProducts();
+}
+
+async function adjustQty(vid, d) {
+  let variant;
+  products.forEach(p => p.variants.forEach(v => { if (v.id===vid) variant=v; }));
+  if (!variant) return;
+  const nq = Math.max(0, variant.qty + d);
+  if (configured) await sb.from('variants').update({ qty: nq }).eq('id', vid);
+  else variant.qty = nq;
+  await loadProducts();
+}
+
+async function setQty(vid) {
+  let variant;
+  products.forEach(p => p.variants.forEach(v => { if (v.id===vid) variant=v; }));
+  const val = prompt('Set quantity:', variant ? variant.qty : 0);
+  if (val === null) return;
+  const nq = Math.max(0, parseInt(val) || 0);
+  if (configured) await sb.from('variants').update({ qty: nq }).eq('id', vid);
+  else variant.qty = nq;
+  await loadProducts();
+}
+
+async function loadLog() {
+  const body = document.getElementById('logBody');
+  const empty = document.getElementById('logEmpty');
+  let takes = [];
+  if (configured) {
+    const { data } = await sb.from('takes').select('*').order('created_at',{ascending:false}).limit(200);
+    takes = data || [];
+  }
+  document.getElementById('statTaken').textContent = takes.reduce((s,t)=>s+t.qty,0);
+  if (!takes.length) { body.innerHTML=''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  body.innerHTML = takes.map(t => `<tr>
+    <td>${new Date(t.created_at).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+    <td>${esc(t.taker_name)}</td><td>${esc(t.product_name)}</td>
+    <td>${esc(t.size||'')}</td><td>${t.qty}</td>
+  </tr>`).join('');
+}
+
+/* ---------- utils ---------- */
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function demoData() {
+  return [
+    { id:'d1', name:'Solotech Hoodie', category:'Hoodie', variants:[
+      {id:'a',size:'S',qty:6},{id:'b',size:'M',qty:12},{id:'c',size:'L',qty:8},{id:'d',size:'XL',qty:3},{id:'e',size:'XXL',qty:0}]},
+    { id:'d2', name:'Crew T-Shirt', category:'T-Shirt', variants:[
+      {id:'f',size:'S',qty:20},{id:'g',size:'M',qty:25},{id:'h',size:'L',qty:18},{id:'i',size:'XL',qty:9}]},
+    { id:'d3', name:'Hi-Vis Vest', category:'Hi-Vis', variants:[
+      {id:'j',size:'M/L',qty:2},{id:'k',size:'XL/XXL',qty:14}]},
+  ];
+}
+
+loadProducts();
+</script>
+</body>
+</html>

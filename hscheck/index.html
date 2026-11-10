@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HS Code Checker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#101418; --panel:#1a2027; --panel2:#20262e; --line:#2c343e;
+  --text:#e8ecf1; --dim:#8b96a3; --accent:#3fa9f5;
+  --ok:#3ecf8e; --warn:#f5b83f; --bad:#f56262; --changed:#b48ef5; --unknown:#6b7683;
+  --mono:'Consolas','Menlo',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,'Segoe UI',Roboto,sans-serif;padding-bottom:60px}
+header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:17px;font-weight:600;letter-spacing:.3px}
+header .sub{color:var(--dim);font-size:12px}
+header .right{margin-left:auto;display:flex;gap:10px;align-items:center}
+select,button,input[type=file]{font:inherit}
+select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button{background:var(--accent);color:#08131c;border:0;border-radius:6px;padding:7px 14px;font-weight:600;cursor:pointer}
+button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+main{max-width:1240px;margin:0 auto;padding:20px 22px;display:flex;flex-direction:column;gap:18px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:860px){.cards{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:10px}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--dim);cursor:pointer;transition:border-color .15s}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--text)}
+.drop input{display:none}
+.meta{margin-top:10px;font-size:12.5px;color:var(--dim)}
+.meta b{color:var(--text)}
+textarea{width:100%;min-height:70px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:8px;font:12.5px var(--mono);margin-top:10px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--panel2);text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.code{font-family:var(--mono);white-space:nowrap}
+.chip{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.4px}
+.chip.ok{background:rgba(62,207,142,.14);color:var(--ok)}
+.chip.warn{background:rgba(245,184,63,.14);color:var(--warn)}
+.chip.bad{background:rgba(245,98,98,.14);color:var(--bad)}
+.chip.changed{background:rgba(180,142,245,.16);color:var(--changed)}
+.chip.unknown{background:rgba(107,118,131,.18);color:#a7b1bc}
+.note{font-size:12px;color:var(--dim)}
+.note.uk{color:#c2d4e4}
+#summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px}
+#summary span b{font-size:16px}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dim);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.tbl-wrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.hint{font-size:12px;color:var(--dim);margin-top:8px}
+#log{font:11.5px var(--mono);color:var(--dim);max-height:90px;overflow:auto;margin-top:8px;white-space:pre-wrap}
+#filterText{background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 10px;min-width:260px}
+th[data-k]{cursor:pointer;user-select:none}
+th[data-k]:hover{color:var(--text)}
+th .arr{font-size:10px;color:var(--accent);margin-left:4px}
+#summary .chip{cursor:pointer}
+#summary .chip.active{outline:1.5px solid currentColor}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>HS Code Checker</h1>
+    <div class="sub">Validate commodity codes against the live UK Trade Tariff and flag recent changes</div>
+  </div>
+  <div class="right">
+    <label class="note">From</label>
+    <select id="origin">
+      <option value="US">United States</option>
+      <option value="UK" selected>United Kingdom</option>
+      <option value="EU">European Union</option>
+      <option value="CA">Canada</option>
+      <option value="CN">China</option>
+      <option value="">Other / unknown</option>
+    </select>
+    <label class="note">To</label>
+    <select id="country">
+      <option value="UK" selected>United Kingdom</option>
+      <option value="EU">European Union</option>
+      <option value="US">United States</option>
+      <option value="CA">Canada</option>
+    </select>
+  </div>
+</header>
+<main>
+  <div class="cards">
+    <div class="card">
+      <h2>1 &middot; Product register</h2>
+      <label class="drop" id="regDrop">Drop your register here (xlsx or csv)<br><span class="note">Needs product ID, description and HS code columns. Auto-detected.</span>
+        <input type="file" id="regFile" accept=".xlsx,.xls,.csv">
+      </label>
+      <div class="meta" id="regMeta">No register loaded</div>
+    </div>
+    <div class="card">
+      <h2>2 &middot; Invoice (optional)</h2>
+      <label class="drop" id="invDrop">Drop a commercial invoice (xlsx, csv or pdf)<br><span class="note">PDFs are read by AI and line items extracted automatically.</span>
+        <input type="file" id="invFile" accept=".xlsx,.xls,.csv,.pdf">
+      </label>
+      <textarea id="pasteBox" placeholder="...or paste invoice lines / a list of HS codes here"></textarea>
+      <div class="row">
+        <button class="secondary" id="pasteBtn">Use pasted text</button>
+        <span class="meta" id="invMeta">No invoice loaded. Without one, the whole register is checked.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-top:0">
+      <button id="runBtn" disabled>Run checks</button>
+      <button class="secondary" id="aiBtn" disabled>Duty &amp; change lookup</button>
+      <button class="secondary" id="exportBtn" disabled>Export CSV</button>
+      <span id="progress" class="note"></span>
+    </div>
+    <div class="hint">Run checks = format validation + register comparison + live UK Trade Tariff lookup (free gov.uk API, origin-aware when destination is UK). Duty &amp; change lookup = Claude searches the web per code for the selected route (e.g. US to Canada): MFN rate, preferential rate under the applicable trade agreement (CUSMA, TCA etc), plus any surtaxes or retaliatory tariffs and recent changes.</div>
+    <div id="log"></div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none">
+    <div id="summary"></div>
+    <div class="row">
+      <input type="text" id="filterText" placeholder="Filter by product, code or note...">
+      <select id="filterStatus">
+        <option value="">All statuses</option>
+        <option value="changed">Changed</option>
+        <option value="invalid">Invalid</option>
+        <option value="warn">Check</option>
+        <option value="ok">OK</option>
+        <option value="unknown">Unknown</option>
+      </select>
+      <span class="note" id="filterCount"></span>
+    </div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table id="results">
+        <thead><tr>
+          <th data-k="pid">Product / line</th><th data-k="clean">HS code</th><th data-k="reg">Register</th><th data-k="status">Status</th><th data-k="uk">UK tariff</th><th data-k="duty">MFN duty</th><th data-k="pref">Preferential</th><th data-k="notes">Notes</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ============ CONFIG ============ */
+const UK_API = 'https://www.trade-tariff.service.gov.uk/api/v2';
+// Claude API: keyless inside claude.ai preview. On Netlify, point this at your own
+// proxy function (e.g. /.netlify/functions/claude) that adds your x-api-key.
+const CLAUDE_URL = 'https://api.anthropic.com/v1/messages';
+const CHANGE_WINDOW_MONTHS = 12;
+
+/* ============ STATE ============ */
+let register = [];            // {pid, desc, hs}
+let regIndex = new Map();     // pid(lower) -> row
+let regByCode = new Map();    // clean code -> [rows]
+let invoice = [];             // {pid, desc, hs, qty}
+let results = [];             // per checked line
+const ukCache = new Map();
+
+const $ = id => document.getElementById(id);
+const log = m => { const el=$('log'); el.textContent += m+'\n'; el.scrollTop=el.scrollHeight; };
+
+/* ============ FILE PARSING ============ */
+function bindDrop(dropId, fileId, handler){
+  const d=$(dropId), f=$(fileId);
+  d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('over')});
+  d.addEventListener('dragleave',()=>d.classList.remove('over'));
+  d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('over');if(e.dataTransfer.files[0])handler(e.dataTransfer.files[0])});
+  f.addEventListener('change',()=>{if(f.files[0])handler(f.files[0])});
+}
+
+function sheetToRows(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        res(XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''}));
+      }catch(err){rej(err)}
+    };
+    r.onerror=rej; r.readAsArrayBuffer(file);
+  });
+}
+
+const cleanCode = c => String(c||'').replace(/[^0-9]/g,'');
+const looksLikeHS = c => { const n=cleanCode(c); return n.length>=6 && n.length<=10 && /^\d+$/.test(n) && +n.slice(0,2)>=1 && +n.slice(0,2)<=99; };
+
+function detectColumns(rows){
+  // score each column across a sample of rows
+  const sample = rows.slice(0, Math.min(rows.length, 400));
+  const width = Math.max(...sample.map(r=>r.length));
+  let hsCol=-1, hsScore=0, descCol=-1, descScore=0, pidCol=-1, pidScore=0;
+  for(let c=0;c<width;c++){
+    let hs=0, txtLen=0, txtCnt=0, idish=0;
+    for(const r of sample){
+      const v=String(r[c]||'').trim(); if(!v) continue;
+      if(/^\d{4}[\.\s]?\d{2}[\.\s]?\d{0,2}[\.\s]?\d{0,4}$/.test(v) && looksLikeHS(v)) hs++;
+      if(/[a-zA-Z]/.test(v)){ txtLen+=v.length; txtCnt++; }
+      if(/^[A-Za-z0-9\-_]{3,20}$/.test(v) && /\d/.test(v) && v.length<=16) idish++;
+    }
+    if(hs>hsScore){hsScore=hs;hsCol=c}
+    const avg = txtCnt? txtLen/txtCnt : 0;
+    if(txtCnt>5 && avg>18 && avg>descScore){descScore=avg;descCol=c}
+  }
+  for(let c=0;c<width;c++){
+    if(c===hsCol||c===descCol) continue;
+    let idish=0, uniq=new Set();
+    for(const r of sample){ const v=String(r[c]||'').trim(); if(!v)continue;
+      if(/^[A-Za-z0-9\-_.]{3,20}$/.test(v) && !/^(true|false|item|nan)$/i.test(v)){ idish++; uniq.add(v.toLowerCase()); } }
+    const score = idish * (uniq.size/Math.max(idish,1));
+    if(score>pidScore){pidScore=score;pidCol=c}
+  }
+  return {pidCol, descCol, hsCol};
+}
+
+async function loadRegister(file){
+  $('regMeta').innerHTML='<span class="spin"></span> Reading...';
+  const rows = await sheetToRows(file);
+  const {pidCol, descCol, hsCol} = detectColumns(rows);
+  if(hsCol<0){ $('regMeta').textContent='Could not find an HS code column.'; return; }
+  register=[]; regIndex.clear(); regByCode.clear();
+  for(const r of rows){
+    const hs=String(r[hsCol]||'').trim();
+    if(!looksLikeHS(hs)) continue;
+    const row={ pid:String(r[pidCol]||'').trim(), desc:String(r[descCol]||'').trim(), hs, clean:cleanCode(hs) };
+    register.push(row);
+    if(row.pid) regIndex.set(row.pid.toLowerCase(), row);
+    if(!regByCode.has(row.clean)) regByCode.set(row.clean,[]);
+    regByCode.get(row.clean).push(row);
+  }
+  const uniq=new Set(register.map(r=>r.clean)).size;
+  $('regMeta').innerHTML=`Loaded <b>${register.length}</b> products, <b>${uniq}</b> unique HS codes (${file.name})`;
+  log(`Register: ${register.length} rows, ${uniq} unique codes. Columns detected: pid=${pidCol}, desc=${descCol}, hs=${hsCol}`);
+  $('runBtn').disabled=false;
+}
+
+async function loadInvoice(file){
+  $('invMeta').innerHTML='<span class="spin"></span> Reading...';
+  if(/\.pdf$/i.test(file.name)){ await loadInvoicePDF(file); return; }
+  const rows=await sheetToRows(file);
+  const {pidCol, descCol, hsCol}=detectColumns(rows);
+  invoice=[];
+  for(const r of rows){
+    const pid = pidCol>=0? String(r[pidCol]||'').trim():'';
+    const hs  = hsCol>=0? String(r[hsCol]||'').trim():'';
+    const desc= descCol>=0? String(r[descCol]||'').trim():'';
+    if(!pid && !looksLikeHS(hs)) continue;
+    if(/^(assetid|pid|item)$/i.test(pid)) continue;
+    invoice.push({pid, desc, hs: looksLikeHS(hs)? hs : ''});
+  }
+  $('invMeta').innerHTML=`Loaded <b>${invoice.length}</b> invoice lines (${file.name})`;
+  log(`Invoice: ${invoice.length} lines from ${file.name}`);
+}
+
+async function loadInvoicePDF(file){
+  try{
+    const b64 = await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file)});
+    const resp = await fetch(CLAUDE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-6', max_tokens:4000,
+      messages:[{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+        {type:'text',text:'Extract every line item from this commercial invoice. Respond ONLY with a JSON array, no markdown fences: [{"pid":"product/part number or empty string","desc":"description","hs":"HS/commodity code with digits only, or empty string","qty":number}]'}
+      ]}]
+    })});
+    const data=await resp.json();
+    const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').replace(/```json|```/g,'').trim();
+    invoice=JSON.parse(txt).map(l=>({pid:String(l.pid||''),desc:String(l.desc||''),hs:String(l.hs||''),qty:l.qty}));
+    $('invMeta').innerHTML=`AI extracted <b>${invoice.length}</b> lines from PDF (${file.name})`;
+    log(`PDF invoice: ${invoice.length} lines extracted`);
+  }catch(err){
+    $('invMeta').textContent='PDF extraction failed: '+err.message;
+    log('PDF error: '+err.message);
+  }
+}
+
+$('pasteBtn').addEventListener('click',()=>{
+  const lines=$('pasteBox').value.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  invoice=[];
+  for(const l of lines){
+    const m=l.match(/\d{4}[\.\s]?\d{2}[\.\s]?\d{0,2}[\.\s]?\d{0,4}/);
+    const hs=m&&looksLikeHS(m[0])?m[0]:'';
+    const rest=l.replace(m?m[0]:'','').replace(/[\t,;]+/g,' ').trim();
+    if(hs||rest) invoice.push({pid:'',desc:rest,hs});
+  }
+  $('invMeta').innerHTML=`Parsed <b>${invoice.length}</b> pasted lines`;
+});
+
+/* ============ VALIDATION ============ */
+function formatCheck(code){
+  const n=cleanCode(code);
+  if(!n) return {ok:false,msg:'No HS code'};
+  if(n.length<6) return {ok:false,msg:`Only ${n.length} digits, minimum 6`};
+  if(n.length>10) return {ok:false,msg:`${n.length} digits, maximum 10`};
+  if(![6,8,10].includes(n.length)) return {ok:false,msg:`${n.length} digits, expected 6, 8 or 10`};
+  const ch=+n.slice(0,2);
+  if(ch<1||ch>99||ch===77||ch===98) return {ok:false,msg:`Chapter ${n.slice(0,2)} is not a valid HS chapter`};
+  return {ok:true,msg:''};
+}
+
+async function ukLookup(code){
+  const n=cleanCode(code);
+  const origin=$('origin').value;
+  const key=n+'|'+origin;
+  if(ukCache.has(key)) return ukCache.get(key);
+  let out={found:false, desc:'', duty:'', pref:'', start:null, changed:false, matchLevel:'', ukCode:''};
+  const geo=origin?`?filter[geographical_area_id]=${origin==='EU'?'1013':origin}`:'';
+  const tryFetch=async url=>{ const r=await fetch(url,{headers:{'Accept':'application/json'}}); if(!r.ok)throw r.status; return r.json(); };
+  try{
+    let data=null, level='';
+    if(n.length===10){
+      try{ data=await tryFetch(`${UK_API}/commodities/${n}${geo}`); level='exact 10-digit'; }catch(e){}
+    }
+    if(!data){
+      // fall back to HS6 via search (covers US-suffix codes)
+      const hs6=n.slice(0,6);
+      const s=await tryFetch(`${UK_API}/search?q=${hs6}`);
+      const ref=s.data&&s.data.attributes;
+      if(ref&&ref.entry&&ref.entry.endpoint&&ref.entry.id){
+        try{ data=await tryFetch(`${UK_API}/${ref.entry.endpoint}/${ref.entry.id}${ref.entry.endpoint==='commodities'?geo:''}`); level=`HS6 (${hs6}) via ${ref.entry.endpoint}`; }catch(e){}
+      }
+    }
+    if(data&&data.data){
+      const a=data.data.attributes||{};
+      out.found=true; out.matchLevel=level;
+      out.desc=(a.formatted_description||a.description||'').replace(/<[^>]+>/g,'');
+      out.ukCode=a.goods_nomenclature_item_id||'';
+      out.start=a.validity_start_date||null;
+      const inc=data.included||[];
+      const mtypes=new Map(inc.filter(i=>i.type==='measure_type').map(i=>[i.id,i.attributes.description]));
+      const dexp=new Map(inc.filter(i=>i.type==='duty_expression').map(i=>[i.id,i.attributes.base]));
+      let newest=null;
+      for(const m of inc.filter(i=>i.type==='measure')){
+        const mt=mtypes.get(m.relationships&&m.relationships.measure_type&&m.relationships.measure_type.data&&m.relationships.measure_type.data.id)||'';
+        const eff=m.attributes&&m.attributes.effective_start_date;
+        if(eff&&(!newest||eff>newest)) newest=eff;
+        const de=m.relationships&&m.relationships.duty_expression&&m.relationships.duty_expression.data;
+        const val=de?(dexp.get(de.id)||'').replace(/<[^>]+>/g,'').trim():'';
+        if(/third country duty/i.test(mt)&&val&&!out.duty) out.duty=val;
+        if(/tariff preference|preferential/i.test(mt)&&val&&!out.pref) out.pref=val;
+      }
+      const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-CHANGE_WINDOW_MONTHS);
+      const cut=cutoff.toISOString().slice(0,10);
+      if((out.start&&out.start.slice(0,10)>=cut)||(newest&&newest.slice(0,10)>=cut)){
+        out.changed=true;
+        out.changedDate=(newest&&newest>out.start?newest:out.start||newest).slice(0,10);
+      }
+    }
+  }catch(err){ out.error=String(err); }
+  ukCache.set(key,out);
+  return out;
+}
+
+async function runChecks(){
+  const lines = invoice.length? invoice : [...regByCode.keys()].map(c=>{
+    const rows=regByCode.get(c); return {pid:rows[0].pid, desc:rows[0].desc+(rows.length>1?` (+${rows.length-1} more products)`:''), hs:rows[0].hs};
+  });
+  if(!lines.length){alert('Nothing to check. Load a register or invoice first.');return;}
+  results = lines.map(l=>({...l, clean:cleanCode(l.hs), status:'pending', reg:'', uk:'', duty:'', notes:[], ai:''}));
+
+  // register comparison
+  for(const r of results){
+    if(!invoice.length){ r.reg='register code'; continue; }
+    const reg=r.pid? regIndex.get(r.pid.toLowerCase()):null;
+    if(reg){
+      if(!r.clean){ r.hs=reg.hs; r.clean=reg.clean; r.reg='filled from register'; }
+      else if(r.clean===reg.clean) r.reg='matches';
+      else { r.reg=`register says ${reg.hs}`; r.notes.push('Code differs from register'); }
+    } else if(r.clean && regByCode.has(r.clean)) r.reg='code known';
+    else r.reg=register.length?'not in register':'';
+  }
+
+  const country=$('country').value;
+  const doUK = country==='UK'||country==='EU'; // EU codes share structure to 8 digits; UK API still useful for HS6 validity
+  $('runBtn').disabled=true;
+  let done=0;
+  const q=[...results];
+  const workers=Array.from({length:5},async()=>{
+    while(q.length){
+      const r=q.shift();
+      const fc=formatCheck(r.hs);
+      if(!fc.ok){ r.status='invalid'; r.notes.push(fc.msg); }
+      else if(doUK){
+        const uk=await ukLookup(r.clean);
+        if(uk.error&&!uk.found){ r.status=r.status==='pending'?'unknown':r.status; r.notes.push('UK API unreachable ('+uk.error+'). If deployed outside claude.ai this may be CORS; add a proxy.'); }
+        else if(!uk.found){ r.status='invalid'; r.notes.push('No match in UK Trade Tariff, even at 6 digits'); }
+        else{
+          r.uk=uk.desc.slice(0,90)+(uk.matchLevel&&!/exact/.test(uk.matchLevel)?` [matched at ${uk.matchLevel}]`:'');
+          r.duty=uk.duty; r.pref=uk.pref||'';
+          if(uk.changed){ r.status='changed'; r.notes.push(`UK measure/code updated ${uk.changedDate}, check your rate`); }
+          else r.status = r.notes.length? 'warn':'ok';
+          if(uk.matchLevel&&!/exact/.test(uk.matchLevel)&&country==='UK') r.notes.push(`10-digit code not valid in UK tariff (US-style suffix?), UK equivalent needed, e.g. ${uk.ukCode}`);
+        }
+      } else { r.status = r.notes.length? 'warn':'ok'; r.notes.push('Format valid. Run the AI check for '+country+' rates.'); }
+      if(r.status==='pending') r.status = r.notes.length?'warn':'ok';
+      done++; $('progress').innerHTML=`<span class="spin"></span> ${done}/${results.length} checked`;
+      render();
+    }
+  });
+  await Promise.all(workers);
+  $('progress').textContent=`${results.length} lines checked`;
+  $('runBtn').disabled=false; $('aiBtn').disabled=false; $('exportBtn').disabled=false;
+  render();
+}
+
+/* ============ AI DUTY + CHANGE LOOKUP ============ */
+async function aiCheck(){
+  const country=$('country').value;
+  const origin=$('origin').value||'unspecified origin';
+  const codes=[...new Set(results.filter(r=>r.clean).map(r=>r.clean))];
+  if(!codes.length)return;
+  $('aiBtn').disabled=true;
+  const batches=[]; for(let i=0;i<codes.length;i+=12)batches.push(codes.slice(i,i+12));
+  let b=0;
+  for(const batch of batches){
+    b++; $('progress').innerHTML=`<span class="spin"></span> Looking up duties, batch ${b}/${batches.length}...`;
+    try{
+      const resp=await fetch(CLAUDE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        model:'claude-sonnet-4-6',max_tokens:4000,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:
+`You are a customs duty assistant. Route: goods of ${origin} origin imported into ${country}. Today: ${new Date().toISOString().slice(0,10)}.
+For each HS code below (may be another country's 10-digit format; classify on the first 6 digits and note if the suffix is not valid for ${country}), search the web where needed and report:
+- mfn: the standard/MFN duty rate in ${country}
+- pref: the preferential rate under the applicable trade agreement for this route if the goods qualify as originating (e.g. CUSMA/USMCA for US-Canada, UK-EU TCA), or "n/a" if no agreement
+- agreement: name of that agreement or ""
+- surtax: any additional duties on this route (retaliatory tariffs, surtaxes, Section 301, trade remedies), or ""
+- status: "ok", "changed" (rate/code changed in last 12 months), "invalid" or "unknown"
+- note: one short sentence, include effective dates for anything recent
+Codes: ${batch.join(', ')}
+Respond ONLY with a JSON array, no markdown: [{"code":"...","mfn":"...","pref":"...","agreement":"...","surtax":"...","status":"...","note":"..."}]`}]
+      })});
+      const data=await resp.json();
+      const txt=(data.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('').replace(/```json|```/g,'').trim();
+      const arr=JSON.parse(txt.slice(txt.indexOf('['),txt.lastIndexOf(']')+1));
+      for(const a of arr){
+        for(const r of results.filter(r=>r.clean===cleanCode(a.code))){
+          if(a.mfn) r.duty=a.mfn;
+          if(a.pref&&a.pref!=='n/a') r.pref=a.pref+(a.agreement?` (${a.agreement})`:'');
+          const bits=[a.note||''];
+          if(a.surtax) bits.unshift('SURTAX: '+a.surtax);
+          r.ai=bits.filter(Boolean).join(' | ');
+          if(a.status==='changed'||a.surtax){ r.status='changed'; }
+          else if(a.status==='invalid'&&r.status!=='changed'){ r.status='invalid'; }
+        }
+      }
+      render();
+    }catch(err){ log('Duty lookup batch '+b+' failed: '+err.message); }
+  }
+  $('progress').textContent='Duty lookup complete';
+  $('aiBtn').disabled=false;
+}
+
+/* ============ RENDER + FILTER + SORT + EXPORT ============ */
+const CHIP={ok:['ok','OK'],warn:['warn','CHECK'],invalid:['bad','INVALID'],changed:['changed','CHANGED'],unknown:['unknown','UNKNOWN'],pending:['unknown','...']};
+const STATUS_ORDER={changed:0,invalid:1,warn:2,unknown:3,pending:4,ok:5};
+let sortKey='', sortDir=1;
+let viewRows=[];
+
+function currentView(){
+  const q=($('filterText').value||'').toLowerCase();
+  const st=$('filterStatus').value;
+  let rows=results.filter(r=>{
+    if(st&&r.status!==st) return false;
+    if(!q) return true;
+    return [r.pid,r.desc,r.hs,r.reg,r.uk,r.duty,r.pref,r.ai,...r.notes].join(' ').toLowerCase().includes(q);
+  });
+  if(sortKey){
+    rows=[...rows].sort((a,b)=>{
+      let va,vb;
+      if(sortKey==='status'){ va=STATUS_ORDER[a.status]??9; vb=STATUS_ORDER[b.status]??9; }
+      else if(sortKey==='notes'){ va=[...a.notes,a.ai].join(' '); vb=[...b.notes,b.ai].join(' '); }
+      else { va=a[sortKey]??''; vb=b[sortKey]??''; }
+      if(typeof va==='number'&&typeof vb==='number') return (va-vb)*sortDir;
+      return String(va).localeCompare(String(vb),undefined,{numeric:true})*sortDir;
+    });
+  }
+  return rows;
+}
+
+function render(){
+  $('resultsCard').style.display='block';
+  const counts={};
+  for(const r of results) counts[r.status]=(counts[r.status]||0)+1;
+  const active=$('filterStatus').value;
+  $('summary').innerHTML=Object.entries(counts).sort((a,b)=>(STATUS_ORDER[a[0]]??9)-(STATUS_ORDER[b[0]]??9))
+    .map(([s,n])=>{const[cls,l]=CHIP[s]||CHIP.unknown;return `<span><b>${n}</b> <span class="chip ${cls}${active===s?' active':''}" data-st="${s}">${l}</span></span>`}).join('');
+  $('summary').querySelectorAll('.chip').forEach(ch=>ch.addEventListener('click',()=>{
+    $('filterStatus').value = $('filterStatus').value===ch.dataset.st? '' : ch.dataset.st; render();
+  }));
+  document.querySelectorAll('#results th[data-k]').forEach(th=>{
+    th.innerHTML=th.textContent.replace(/[\u25b2\u25bc]/g,'').trim()+(th.dataset.k===sortKey?`<span class="arr">${sortDir>0?'\u25b2':'\u25bc'}</span>`:'');
+  });
+  viewRows=currentView();
+  $('filterCount').textContent = viewRows.length===results.length? `${results.length} lines` : `${viewRows.length} of ${results.length} lines`;
+  const tb=$('results').querySelector('tbody'); tb.innerHTML='';
+  for(const r of viewRows){
+    const [cls,label]=CHIP[r.status]||CHIP.unknown;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${esc(r.pid)}${r.pid&&r.desc?'<br>':''}<span class="note">${esc(r.desc.slice(0,70))}</span></td>
+      <td class="code">${esc(r.hs||'\u2014')}</td>
+      <td class="note">${esc(r.reg)}</td>
+      <td><span class="chip ${cls}">${label}</span></td>
+      <td class="note uk">${esc(r.uk||'')}</td>
+      <td class="code">${esc(r.duty||'')}</td>
+      <td class="code">${esc(r.pref||'')}</td>
+      <td class="note">${esc([...r.notes,r.ai].filter(Boolean).join(' | '))}</td>`;
+    tb.appendChild(tr);
+  }
+}
+document.querySelectorAll('#results th[data-k]').forEach(th=>th.addEventListener('click',()=>{
+  const k=th.dataset.k;
+  if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; }
+  render();
+}));
+$('filterText').addEventListener('input',render);
+$('filterStatus').addEventListener('change',render);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+$('exportBtn').addEventListener('click',()=>{
+  const head=['pid','description','hs_code','register','status','uk_tariff_match','mfn_duty','preferential','notes','ai_note','route'];
+  const route=($('origin').value||'?')+' to '+$('country').value;
+  const rows=viewRows.length?viewRows:results;
+  const csv=[head.join(',')].concat(rows.map(r=>[r.pid,r.desc,r.hs,r.reg,r.status,r.uk,r.duty,r.pref||'',r.notes.join('; '),r.ai,route]
+    .map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(','))).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='hs_check_results.csv'; a.click();
+});
+
+bindDrop('regDrop','regFile',loadRegister);
+bindDrop('invDrop','invFile',loadInvoice);
+$('runBtn').addEventListener('click',runChecks);
+$('aiBtn').addEventListener('click',aiCheck);
+</script>
+</body>
+</html>
