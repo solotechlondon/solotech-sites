@@ -16,6 +16,7 @@ main{gap:10px}.card{padding:12px;gap:8px;border-radius:12px}.top{padding-block:1
 .per{font:700 14px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text);margin-top:6px}
 .lt{width:100%;border-collapse:collapse;font-size:14px}.lt th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;padding:2px 4px}.lt th:nth-child(2),.lt td:nth-child(2){text-align:left}.lt td{padding:7px 4px;text-align:center;border-top:1px solid var(--line)}.lt td:nth-child(2){font-weight:500}.lt tr.us td{background:var(--soft-claret);font-weight:700}.lt tr.cut td{border-bottom:2px solid var(--claret)}
 .perrow{display:flex;gap:6px}.perb{flex:1;min-width:0;min-height:44px}.perb[aria-pressed="true"]{background:var(--claret);border-color:var(--claret);color:var(--on-claret)}
+.fixg{text-align:left;background:none;border:0;color:inherit;font:inherit;padding:0;flex:1}.fixg i{font-style:normal;font-size:12px;color:var(--accent-text);text-decoration:underline;margin-left:4px}.pick.on{outline:3px solid var(--claret)}.livebar{align-items:center}.livet{flex:1;font:700 18px/1 var(--f-display)}
 </style>
 <title>Chesham U11 Scorebook</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Lexend:wght@400;500;600&display=swap">
@@ -197,7 +198,7 @@ body{overscroll-behavior-y:none}
 <script>
 (function(){
 'use strict';
-var LS='chesham-u11-scorebook';
+var LS='chesham-u11-scorebook';var TEST=false;try{TEST=localStorage.getItem('chesham-u11-scorebook-test')==='1';}catch(e){}
 var app=document.getElementById('app');
 var S=null, db=null, ref=null, writing=false, dirty=false, toastTimer=null;
 var needSave=false;
@@ -325,7 +326,7 @@ async function togglePush(){
   }catch(e){flash('Could not turn alerts on');}
 }
 function pushNotify(title,body,m){
-  if(!REMOTE||!ADMIN||!PW)return;
+  if(TEST||!REMOTE||!ADMIN||!PW)return;
   try{fetch(CFG.url+'/functions/v1/notify',{method:'POST',headers:hdrs(),body:JSON.stringify({pw:PW,title:title,body:body||'',tag:m?m.id:'scorebook',team:m?m.teamId:null})}).catch(function(){});}catch(e){}
 }
 function nextDay(t){
@@ -380,6 +381,7 @@ function waUrl(msg,tid){
 }
 function openUrl(u){try{var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();a.remove();}catch(e){}}
 function postWA(msg,m,ev){
+  if(TEST){flash('Test mode: not posted');return;}
   if(!WA.on||(ev&&WA.ev&&WA.ev[ev]===false))return;
   try{navigator.clipboard.writeText(msg).catch(function(){});}catch(e){}
   openUrl(waUrl(msg,m.teamId));
@@ -425,7 +427,7 @@ function teamsHtml(){
   return '<div class="teams">'+S.teams.map(function(t){return '<button class="team" data-act="team" data-t="'+t.id+'" aria-pressed="'+(t.id===cur.id)+'"><b>'+esc(t.tab)+'</b><span>'+esc(t.sub)+'</span></button>';}).join('')+'</div>';
 }
 function headerHtml(){
-  return '<header class="top"><div class="club">Chesham Utd U11<small>Scorebook'+(REMOTE&&!ADMIN?' (view only)':'')+'</small></div><div class="hdr-r"><div class="sync" id="sync" data-s="'+ui.status+'" role="status">'+(STATUS[ui.status]||'')+'</div>'+(REMOTE&&CFG.vapid?'<button class="lb" data-act="notify" aria-label="'+(PUSH.on?'Turn goal alerts off':'Turn goal alerts on')+'">'+(PUSH.on?'\uD83D\uDD14':'\uD83D\uDD15')+'</button>':'')+(REMOTE?'<button class="lb" data-act="adminBtn">'+(ADMIN?'Log out':'Admin')+'</button>':'')+'</div></header>';
+  return '<header class="top"><div class="club">Chesham Utd U11<small>Scorebook'+(REMOTE&&!ADMIN?' (view only)':'')+(TEST?' (TEST MODE)':'')+'</small></div><div class="hdr-r"><div class="sync" id="sync" data-s="'+ui.status+'" role="status">'+(STATUS[ui.status]||'')+'</div>'+(REMOTE&&CFG.vapid?'<button class="lb" data-act="notify" aria-label="'+(PUSH.on?'Turn goal alerts off':'Turn goal alerts on')+'">'+(PUSH.on?'\uD83D\uDD14':'\uD83D\uDD15')+'</button>':'')+(REMOTE?'<button class="lb" data-act="adminBtn">'+(ADMIN?'Log out':'Admin')+'</button>':'')+'</div></header>';
 }
 function tabsHtml(){
   var t=[['match','Match'],['squad','Squad'],['results','Results']];
@@ -441,12 +443,15 @@ function matchView(){
   if(!m)return emptyMatchView();
   var q=encodeURIComponent(m.venue||'');
   var h='';
-  h+='<div class="row"><button class="btn ghost" data-act="pick">Switch match</button><button class="btn ghost" data-act="newMatch">New match</button></div>';
-  h+='<section class="card"><div class="fix-top"><h2>'+esc(m.comp||'Fixture')+'</h2>'+statusPill(m)+'</div>';
+  var live=(m.status==='live'&&!ui.showFix);
+  if(live)h+='<div class="row livebar"><div class="livet">vs '+esc(m.opp)+'</div><button class="btn ghost" data-act="toggleFix">Details</button></div>';
+  else h+='<div class="row"><button class="btn ghost" data-act="pick">Switch match</button><button class="btn ghost" data-act="newMatch">New match</button>'+(m.status==='live'?'<button class="btn ghost" data-act="toggleFix">Hide</button>':'')+'</div>';
+  if(!live)h+='<section class="card"><div class="fix-top"><h2>'+esc(m.comp||'Fixture')+'</h2>'+statusPill(m)+'</div>';
   h+='<div class="vs">vs '+esc(m.opp)+'</div><div class="date">'+esc(fmtDate(m.date))+'</div>';
   h+='<dl class="facts"><div><dt>Meet</dt><dd>'+esc(fmtTime(m.meet))+'</dd></div><div><dt>Kick off</dt><dd>'+esc(fmtTime(m.ko))+'</dd></div></dl>';
   if(m.venue)h+='<p class="venue"><b>Venue</b>'+esc(m.venue)+'</p>';
   h+='<div class="links">'+(m.venue?'<a href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">Directions</a>':'')+'<button data-act="quick">Quick edit</button><button data-act="editMatch">Edit details</button></div></section>';
+  if(false){}
 
   if(m.status==='live'){var e0=elapsed(m),tt=teamOf(m),cp=m.clock.p||1;
     var pbtn=m.clock.brk?'<button class="btn primary wide" data-act="nextPeriod">Start '+tt.unit.toLowerCase()+' '+(cp+1)+'</button>':cp>=tt.n?'<button class="btn primary wide" data-act="status">End match</button>':'<button class="btn primary wide" data-act="endPeriod">End '+tt.unit.toLowerCase()+' '+cp+' (break)</button>';
@@ -455,10 +460,10 @@ function matchView(){
   h+='<section class="board" aria-label="Score"><div><div class="tname">Chesham</div><div class="score">'+m.us+'</div><button class="mini" data-act="adj" data-t="us" aria-label="Take one off Chesham score">-1</button></div><div class="sep"></div><div><div class="tname">'+esc(m.opp)+'</div><div class="score">'+m.them+'</div><button class="mini" data-act="adj" data-t="them" aria-label="Take one off '+esc(m.opp)+' score">-1</button></div></section>';
   h+='<div class="row"><button class="btn primary big" data-act="openUs">+ Chesham goal</button><button class="btn big" data-act="openThem">+ '+esc(m.opp)+' goal</button></div>';
   if(m.status==='final'){var ug=m.us-m.goals.filter(function(x){return x.team==='us';}).length,ut=m.them-m.goals.filter(function(x){return x.team==='them';}).length;if(ADMIN&&(ug>0||ut>0))h+='<p class="hint">Scorers not added yet: '+(ug>0?ug+' Chesham':'')+(ug>0&&ut>0?', ':'')+(ut>0?ut+' '+esc(m.opp):'')+'. Tap a goal button to add them. The score will not change.</p>';}
+  var lab=m.status==='live'?'End match early':'Reopen match';
+  if(m.status!=='upcoming')h+='<div class="row"><button class="btn primary" data-act="share">Share to WhatsApp</button><button class="btn'+(m.status==='live'?' ghost':'')+'" data-act="status">'+lab+'</button></div>';
+  h+='<div class="wa"><label class="sw"><input type="checkbox" id="testOn"'+(TEST?' checked':'')+'><span>Test mode (no WhatsApp, no alerts)</span></label></div>';
   h+='<div class="wa"><label class="sw"><input type="checkbox" id="waOn"'+(WA.on?' checked':'')+'><span>Post to WhatsApp (kick off, goals, full time)</span></label><button class="lb" data-act="waSetup">Setup</button></div>';
-  var lab=m.status==='upcoming'?'Start match (posts game details)':m.status==='live'?'End match early':'Reopen match';
-  if(m.status!=='upcoming')h+='<button class="btn'+(m.status==='live'?' ghost':'')+' wide" data-act="status">'+lab+'</button>';
-  if(m.status!=='upcoming')h+='<button class="btn wide" data-act="share">Share to WhatsApp</button>';
 
   if(m.goals.length){
     var gs=m.goals.map(function(g,i){return {g:g,i:i};}).sort(function(a,b){var ap=goalPer(m,a.g)||99,bp=goalPer(m,b.g)||99;var am=a.g.min==null?9999:a.g.min,bm=b.g.min==null?9999:b.g.min;return ap-bp||am-bm||a.i-b.i;});
@@ -495,7 +500,7 @@ function goalRow(m,g){
     if(g.scorer==='og')who='Own goal';
     else{var p=byId(S.players,g.scorer);who=p?tag(p)+' '+esc(p.name)+(g.pen?' (pen)':''):'Scorer not logged';}
   } else who=g.num?'#'+esc(g.num):'Number not logged';
-  return '<li class="goal '+(us?'us':'them')+'"><span class="min">'+(g.min!=null?g.min+"'":g.q?esc(g.q):'')+'</span><span class="who"><b>'+(us?'Chesham':esc(m.opp))+'</b><br>'+who+'</span><button class="x" data-act="delGoal" data-gid="'+g.id+'" data-confirm aria-label="Delete goal">&times;</button></li>';
+  return '<li class="goal '+(us?'us':'them')+'"><span class="min">'+(g.min!=null?g.min+"'":g.q?esc(g.q):'')+'</span>'+(ADMIN?'<button class="who fixg" data-act="fixGoal" data-gid="'+g.id+'"><b>'+(us?'Chesham':esc(m.opp))+'</b><br>'+who+' <i>change</i></button>':'<span class="who"><b>'+(us?'Chesham':esc(m.opp))+'</b><br>'+who+'</span>')+'<button class="x" data-act="delGoal" data-gid="'+g.id+'" data-confirm aria-label="Delete goal">&times;</button></li>';
 }
 
 function squadView(){
@@ -549,6 +554,17 @@ function sheetHtml(){
     var list=sortedPlayers(teamPlayers(m.teamId).filter(function(p){return !m.squad.length||m.squad.indexOf(p.id)>-1;}));
     h='<div class="sheet-top"><h3>Chesham goal</h3>'+close+'</div>';
     h+=perRowHtml(m)+'<div class="stp"><button class="btn" data-act="minAdj" data-d="-5">-5</button><button class="btn" data-act="minAdj" data-d="-1">-1</button><label>Min<input class="field" id="gMin" readonly inputmode="none" value="'+esc(s.min==null?'':s.min)+'"></label><button class="btn" data-act="minAdj" data-d="1">+1</button><button class="btn" data-act="minAdj" data-d="5">+5</button></div><div class="picks">'+list.map(function(p){return '<button class="pick" data-act="addUs" data-pid="'+p.id+'"><b>'+(p.num?esc(p.num):'?')+'</b><span>'+esc(p.name)+(p.gk?' (GK)':'')+'</span></button>';}).join('')+'<button class="pick other" data-act="addUs" data-pid="og"><span>Own goal</span></button><button class="pick other" data-act="addUs" data-pid=""><span>Not sure</span></button></div>';
+  } else if(s.type==='fix'){
+    var fg=byId(m.goals,s.gid);
+    if(!fg){h='<div class="sheet-top"><h3>Goal</h3>'+close+'</div>';}
+    else if(fg.team==='us'){
+      var fl=sortedPlayers(teamPlayers(m.teamId).filter(function(p){return !m.squad.length||m.squad.indexOf(p.id)>-1;}));
+      h='<div class="sheet-top"><h3>Who scored?'+(fg.min!=null?' '+fg.min+"'":'')+'</h3>'+close+'</div><p class="hint">Keeps the score and time.</p><div class="picks">'+fl.map(function(p){return '<button class="pick'+(fg.scorer===p.id?' on':'')+'" data-act="setScorer" data-pid="'+p.id+'"><b>'+(p.num?esc(p.num):'?')+'</b><span>'+esc(p.name)+(p.gk?' (GK)':'')+'</span></button>';}).join('')+'</div><div class="row"><button class="btn" data-act="setScorer" data-pid="og">Own goal</button><button class="btn" data-act="setScorer" data-pid="">Not sure</button></div>';
+    } else {
+      var fo=m.oppNums.slice().sort(function(a,b){return (toInt(a.num)||0)-(toInt(b.num)||0);});
+      h='<div class="sheet-top"><h3>Shirt number?</h3>'+close+'</div><p class="hint">Keeps the score and time.</p>'+(fo.length?'<div class="picks">'+fo.map(function(n){return '<button class="pick'+(fg.num===n.num?' on':'')+'" data-act="setNum" data-num="'+esc(n.num)+'"><b>'+esc(n.num)+'</b></button>';}).join('')+'</div>':'')+'<label class="lab">Shirt number<input class="field" id="gNum" inputmode="numeric" maxlength="3" placeholder="or type a number"></label><div class="row"><button class="btn primary" data-act="setNumTyped">Save</button><button class="btn" data-act="setNum" data-num="">Not known</button></div>';
+    }
+    if(fg){var tfx=teamOf(m),pb='';for(var pi2=1;pi2<=tfx.n;pi2++)pb+='<button class="btn perb" data-act="setPer" data-p="'+pi2+'" aria-pressed="'+(goalPer(m,fg)===pi2?'true':'false')+'">'+tfx.unit.charAt(0)+pi2+'</button>';h+='<p class="hint" style="margin:8px 0 4px">'+esc(tfx.unit)+'</p><div class="perrow">'+pb+'</div>';}
   } else if(s.type==='quick'){
     var qm=byId(S.matches,s.id)||m,ql=sortedPlayers(teamPlayers(qm.teamId));
     var qg=qm.goals.map(function(g,i){return {g:g,i:i};}).sort(function(a,b){var am=a.g.min==null?9999:a.g.min,bm=b.g.min==null?9999:b.g.min;return am-bm||a.i-b.i;});
@@ -714,7 +730,7 @@ app.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');if(!el||!S)return;
   var act=el.getAttribute('data-act');
   if(act==='backdrop'){if(e.target===el){ui.sheet=null;render();}return;}
-  if(REMOTE&&!ADMIN&&['team','tab','close','pick','openMatch','adminBtn','doLogin','notify','alertsOff'].indexOf(act)<0)return;
+  if(REMOTE&&!ADMIN&&['team','tab','close','pick','openMatch','adminBtn','doLogin','notify','alertsOff','toggleFix'].indexOf(act)<0)return;
   if(el.hasAttribute('data-confirm')&&el.getAttribute('data-sure')!=='1'){
     el.setAttribute('data-sure','1');el.setAttribute('data-label',el.textContent);
     el.textContent=el.classList.contains('x')?'Sure?':'Tap again to confirm';
@@ -742,6 +758,12 @@ app.addEventListener('click',function(e){
     case 'openUs':ui.sheet={type:'goalUs',min:clockMin(m)};render();break;
     case 'openThem':ui.sheet={type:'goalThem',min:clockMin(m)};render();break;
     case 'perSet':var pv=el.getAttribute('data-p'),pi=$('#gPer');if(pi){pi.value=(pi.value===pv?'':pv);[].forEach.call(app.querySelectorAll('.perb'),function(b){b.setAttribute('aria-pressed',b.getAttribute('data-p')===pi.value?'true':'false');});}break;
+    case 'fixGoal':ui.sheet={type:'fix',gid:el.getAttribute('data-gid')};render();break;
+    case 'setScorer':var fg1=byId(m.goals,ui.sheet&&ui.sheet.gid);if(fg1){var pv1=el.getAttribute('data-pid');fg1.scorer=pv1||null;}ui.sheet=null;commit();break;
+    case 'setNum':var fg2=byId(m.goals,ui.sheet&&ui.sheet.gid);if(fg2){var nv=el.getAttribute('data-num');fg2.num=nv||null;if(nv&&!byId2(m.oppNums,nv))m.oppNums.push({num:nv,note:''});}ui.sheet=null;commit();break;
+    case 'setNumTyped':var fg3=byId(m.goals,ui.sheet&&ui.sheet.gid),nt=cleanNum($('#gNum').value);if(fg3&&nt){fg3.num=nt;if(!byId2(m.oppNums,nt))m.oppNums.push({num:nt,note:''});}ui.sheet=null;commit();break;
+    case 'setPer':var fg4=byId(m.goals,ui.sheet&&ui.sheet.gid);if(fg4){var pp4=toInt(el.getAttribute('data-p'));if(pp4)fg4.per=pp4;}commit();break;
+    case 'toggleFix':ui.showFix=!ui.showFix;render();break;
     case 'minAdj':var gi=$('#gMin');if(gi){var cv=toInt(gi.value);gi.value=Math.max(0,(cv===null?0:cv)+toInt(el.getAttribute('data-d')));}break;
     case 'quick':ui.sheet={type:'quick',id:m.id};render();break;
     case 'qAdd':var qm1=quickRead();if(qm1){var tm1=el.getAttribute('data-t');qm1.goals.push({id:uid(),team:tm1,min:null,scorer:null});if(qm1.goals.filter(function(x){return x.team===tm1;}).length>qm1[tm1])qm1[tm1]++;render();}break;
@@ -786,6 +808,7 @@ app.addEventListener('click',function(e){
   }
 });
 app.addEventListener('change',function(e){
+  if(e.target.id==='testOn'){TEST=e.target.checked;try{localStorage.setItem(LS+'-test',TEST?'1':'0');}catch(x){}render();flash(TEST?'Test mode on: nothing is sent':'Test mode off');return;}
   if(e.target.id==='waOn'){WA.on=e.target.checked;saveWA();flash(WA.on?'WhatsApp updates on':'WhatsApp updates off');return;}
   if(e.target.name==='alertTeam'){var ck=[].map.call(app.querySelectorAll('input[name=alertTeam]:checked'),function(x){return x.value;});setAlertTeams(ck);syncSub();return;}
   if(e.target.name==='waEv'){WA.ev=WA.ev||{};WA.ev[e.target.value]=e.target.checked;saveWA();return;}
