@@ -17,6 +17,7 @@ main{gap:10px}.card{padding:12px;gap:8px;border-radius:12px}.top{padding-block:1
 .lt{width:100%;border-collapse:collapse;font-size:14px}.lt th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;padding:2px 4px}.lt th:nth-child(2),.lt td:nth-child(2){text-align:left}.lt td{padding:7px 4px;text-align:center;border-top:1px solid var(--line)}.lt td:nth-child(2){font-weight:500}.lt tr.us td{background:var(--soft-claret);font-weight:700}.lt tr.cut td{border-bottom:2px solid var(--claret)}
 .perrow{display:flex;gap:6px}.perb{flex:1;min-width:0;min-height:44px}.perb[aria-pressed="true"]{background:var(--claret);border-color:var(--claret);color:var(--on-claret)}
 .fixg{text-align:left;background:none;border:0;color:inherit;font:inherit;padding:0;flex:1}.fixg i{font-style:normal;font-size:12px;color:var(--accent-text);text-decoration:underline;margin-left:4px}.pick.on{outline:3px solid var(--claret)}.livebar{align-items:center}.livet{flex:1;font:700 18px/1 var(--f-display)}
+.instbar{display:flex;align-items:center;gap:10px;margin:0 16px 8px;padding:8px 10px;border-radius:12px;background:var(--soft-claret);border:1px solid var(--line)}.instbar div{flex:1;display:flex;flex-direction:column;font-size:14px}.instbar span{font-size:12px;color:var(--muted)}.instbar .btn{min-height:40px}.steps{padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:16px}
 </style>
 <title>Chesham U11 Scorebook</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Lexend:wght@400;500;600&display=swap">
@@ -607,6 +608,9 @@ function sheetHtml(){
     var mode=s.mode||(m.status==='final'?'full':'quick');
     var msg=mode==='quick'?buildQuick(m):buildMsg(m);
     h='<div class="sheet-top"><h3>Share to WhatsApp</h3>'+close+'</div><div class="row"><button class="btn'+(mode==='quick'?' primary':'')+'" data-act="shareMode" data-mode="quick">Quick update</button><button class="btn'+(mode==='full'?' primary':'')+'" data-act="shareMode" data-mode="full">Full report</button></div><label class="lab">Message<textarea class="field" id="sText" rows="10">'+esc(msg)+'</textarea></label><div class="row"><button class="btn primary big" data-act="shareOpen">Open WhatsApp</button><button class="btn big" data-act="copyMsg">Copy message</button></div><p class="hint">You can edit the message before sending.</p>';
+  } else if(s.type==='install'){
+    var ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    h='<div class="sheet-top"><h3>Add to Home Screen</h3>'+close+'</div>'+(ios?'<ol class="steps"><li>Open this page in <b>Safari</b>.</li><li>Tap the <b>Share</b> button (square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li><li>Open the app from the new icon.</li><li>Tap anywhere and press <b>Allow</b> for alerts.</li></ol>':'<ol class="steps"><li>Open this page in <b>Chrome</b>.</li><li>Tap the <b>3 dots</b> at the top right.</li><li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li><li>Open the app from the new icon.</li><li>Tap anywhere and press <b>Allow</b> for alerts.</li></ol>');
   } else if(s.type==='alerts'){
     var at=alertTeams();
     h='<div class="sheet-top"><h3>Alerts</h3>'+close+'</div><div class="card"><h2>Send me alerts for</h2><div class="sq" style="flex-direction:column;align-items:stretch">'+S.teams.map(function(t){return '<label><input type="checkbox" name="alertTeam" value="'+t.id+'"'+(at.indexOf(t.id)>-1?' checked':'')+'><span>'+esc(t.tab)+' '+esc(t.sub)+'</span></label>';}).join('')+'</div><p class="hint">Untick the team your child is not in.</p></div><button class="btn big" data-act="alertsOff">Turn all alerts off</button>';
@@ -626,9 +630,16 @@ function sheetHtml(){
 }
 function byId2(arr,n){for(var i=0;i<arr.length;i++){if(arr[i].num===n)return arr[i];}return null;}
 
+var DEFER=null;
+function isStandalone(){try{return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;}catch(e){return false;}}
+function installHidden(){try{return localStorage.getItem(LS+'-noinstall')==='1';}catch(e){return false;}}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();DEFER=e;if(typeof render==='function'&&S!==null)render();});
+window.addEventListener('appinstalled',function(){DEFER=null;try{localStorage.setItem(LS+'-noinstall','1');}catch(e){}render();});
+function installBar(){if(isStandalone()||installHidden())return '';
+  return '<div class="instbar"><div><b>Add to Home Screen</b><span>For live goal alerts</span></div><button class="btn primary" data-act="install">Add</button><button class="x" data-act="noInstall" aria-label="Hide">&times;</button></div>';}
 function render(){
   var body=S===null?loadingView():ui.tab==='match'?matchView():ui.tab==='squad'?squadView():resultsView();
-  app.innerHTML=headerHtml()+teamsHtml()+'<main>'+body+'</main>'+tabsHtml()+sheetHtml()+(ui.toast?'<div class="toast" role="status">'+esc(ui.toast)+'</div>':'');
+  app.innerHTML=headerHtml()+installBar()+teamsHtml()+'<main>'+body+'</main>'+tabsHtml()+sheetHtml()+(ui.toast?'<div class="toast" role="status">'+esc(ui.toast)+'</div>':'');
   if(!ADMIN){
     [].forEach.call(app.querySelectorAll('.adm,[data-act="newMatch"],[data-act="editMatch"],[data-act="quick"],[data-act="adj"],[data-act="openUs"],[data-act="openThem"],[data-act="status"],[data-act="share"],[data-act="waSetup"],.wa,[data-act="newOpp"],[data-act="delGoal"],[data-act="addPlayer"],[data-act="delPlayer"],.cbtns'),function(n){n.remove();});
     [].forEach.call(app.querySelectorAll('[data-field]'),function(n){n.disabled=true;});
@@ -730,7 +741,7 @@ app.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');if(!el||!S)return;
   var act=el.getAttribute('data-act');
   if(act==='backdrop'){if(e.target===el){ui.sheet=null;render();}return;}
-  if(REMOTE&&!ADMIN&&['team','tab','close','pick','openMatch','adminBtn','doLogin','notify','alertsOff','toggleFix'].indexOf(act)<0)return;
+  if(REMOTE&&!ADMIN&&['team','tab','close','pick','openMatch','adminBtn','doLogin','notify','alertsOff','toggleFix','install','noInstall'].indexOf(act)<0)return;
   if(el.hasAttribute('data-confirm')&&el.getAttribute('data-sure')!=='1'){
     el.setAttribute('data-sure','1');el.setAttribute('data-label',el.textContent);
     el.textContent=el.classList.contains('x')?'Sure?':'Tap again to confirm';
@@ -764,6 +775,8 @@ app.addEventListener('click',function(e){
     case 'setNumTyped':var fg3=byId(m.goals,ui.sheet&&ui.sheet.gid),nt=cleanNum($('#gNum').value);if(fg3&&nt){fg3.num=nt;if(!byId2(m.oppNums,nt))m.oppNums.push({num:nt,note:''});}ui.sheet=null;commit();break;
     case 'setPer':var fg4=byId(m.goals,ui.sheet&&ui.sheet.gid);if(fg4){var pp4=toInt(el.getAttribute('data-p'));if(pp4)fg4.per=pp4;}commit();break;
     case 'toggleFix':ui.showFix=!ui.showFix;render();break;
+    case 'install':if(DEFER){DEFER.prompt();DEFER.userChoice&&DEFER.userChoice.then(function(){DEFER=null;render();});}else{ui.sheet={type:'install'};render();}break;
+    case 'noInstall':try{localStorage.setItem(LS+'-noinstall','1');}catch(e){}render();break;
     case 'minAdj':var gi=$('#gMin');if(gi){var cv=toInt(gi.value);gi.value=Math.max(0,(cv===null?0:cv)+toInt(el.getAttribute('data-d')));}break;
     case 'quick':ui.sheet={type:'quick',id:m.id};render();break;
     case 'qAdd':var qm1=quickRead();if(qm1){var tm1=el.getAttribute('data-t');qm1.goals.push({id:uid(),team:tm1,min:null,scorer:null});if(qm1.goals.filter(function(x){return x.team===tm1;}).length>qm1[tm1])qm1[tm1]++;render();}break;
